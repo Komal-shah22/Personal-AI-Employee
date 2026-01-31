@@ -14,6 +14,7 @@ from pathlib import Path
 from datetime import datetime
 import subprocess
 import threading
+import sys
 
 class PersonalAIEmployeeOrchestrator:
     def __init__(self, config_path="config.json"):
@@ -37,10 +38,48 @@ class PersonalAIEmployeeOrchestrator:
         )
         self.logger = logging.getLogger(__name__)
 
+    def update_dashboard(self):
+        """Update the dashboard automatically when changes occur"""
+        try:
+            # Import the update-dashboard skill function
+            sys.path.append('.claude/skills/update-dashboard/')
+            from skill import run_skill
+            result = run_skill()
+            self.logger.info(f"Dashboard updated: {result}")
+        except ImportError:
+            # Alternative: run the skill as a subprocess
+            try:
+                import subprocess
+                result = subprocess.run([sys.executable, '.claude/skills/update-dashboard/skill.py'],
+                                      capture_output=True, text=True)
+                self.logger.info(f"Dashboard update process completed: {result.returncode}")
+                if result.stdout:
+                    self.logger.debug(f"Dashboard update output: {result.stdout}")
+                if result.stderr:
+                    self.logger.error(f"Dashboard update error: {result.stderr}")
+            except Exception as e:
+                self.logger.error(f"Error updating dashboard: {e}")
+        except Exception as e:
+            self.logger.error(f"Error in dashboard update: {e}")
+
     def check_needs_action(self):
         """Check if there are items in the Needs_Action folder"""
         needs_action_dir = Path(self.config['directories']['needs_action'])
+
+        # Ensure the directory exists
+        needs_action_dir.mkdir(parents=True, exist_ok=True)
+
         action_items = list(needs_action_dir.glob('*.md'))
+
+        # Update dashboard if there are changes in the number of pending items
+        if hasattr(self, '_previous_pending_count'):
+            current_count = len(action_items)
+            if current_count != self._previous_pending_count:
+                self.logger.info(f"Action items count changed from {self._previous_pending_count} to {current_count}, updating dashboard")
+                self.update_dashboard()
+        self._previous_pending_count = len(action_items)
+
+        self.logger.info(f"Found {len(action_items)} action items in Needs_Action")
         return action_items
 
     def process_action_item(self, item_path):
@@ -66,6 +105,9 @@ class PersonalAIEmployeeOrchestrator:
         done_path = done_dir / item_path.name
         item_path.rename(done_path)
         self.logger.info(f"Moved to Done: {done_path}")
+
+        # Update the dashboard to reflect the change
+        self.update_dashboard()
 
     def generate_plan(self, content, item_path):
         """Generate a plan using Claude Code logic"""
@@ -97,6 +139,9 @@ Within 24 hours
     def run(self):
         """Main execution loop"""
         self.logger.info("Starting Personal AI Employee Orchestrator")
+
+        # Initialize the previous pending count
+        self._previous_pending_count = 0
 
         while True:
             try:

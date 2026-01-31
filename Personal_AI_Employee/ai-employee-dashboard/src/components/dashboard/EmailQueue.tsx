@@ -47,68 +47,34 @@ export const EmailQueue = () => {
   const [emails, setEmails] = useState<EmailItem[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    // Simulate API call to fetch emails
-    const fetchEmails = async () => {
+  const fetchEmails = async () => {
+    try {
       setLoading(true);
 
-      // Simulate API delay
-      await new Promise(resolve => setTimeout(resolve, 500));
+      // Fetch from the API
+      const response = await fetch('/api/emails');
+      if (!response.ok) throw new Error('Failed to fetch emails');
 
-      // Mock data - in a real app this would come from an API
-      const mockEmails: EmailItem[] = [
-        {
-          id: '1',
-          from: 'marketing@company.com',
-          subject: 'Q4 Campaign Results',
-          preview: 'The Q4 marketing campaign exceeded expectations with a 23% increase in conversions...',
-          priority: 'urgent',
-          time: new Date(Date.now() - 1000 * 60 * 5).toISOString(),
-          unread: true,
-        },
-        {
-          id: '2',
-          from: 'support@client.com',
-          subject: 'Support Ticket #12345',
-          preview: 'Customer reported an issue with the latest invoice. Need urgent assistance...',
-          priority: 'high',
-          time: new Date(Date.now() - 1000 * 60 * 15).toISOString(),
-          unread: true,
-        },
-        {
-          id: '3',
-          from: 'team@internal.com',
-          subject: 'Weekly Sync Meeting',
-          preview: 'Reminder: Weekly sync meeting scheduled for tomorrow at 10 AM. Agenda attached...',
-          priority: 'normal',
-          time: new Date(Date.now() - 1000 * 60 * 30).toISOString(),
-          unread: false,
-        },
-        {
-          id: '4',
-          from: 'hr@company.com',
-          subject: 'Policy Updates',
-          preview: 'New company policies effective next month. Please review and acknowledge...',
-          priority: 'normal',
-          time: new Date(Date.now() - 1000 * 60 * 45).toISOString(),
-          unread: false,
-        },
-        {
-          id: '5',
-          from: 'finance@company.com',
-          subject: 'Budget Approval',
-          preview: 'Please review and approve the Q1 budget proposal by Friday...',
-          priority: 'high',
-          time: new Date(Date.now() - 1000 * 60 * 60).toISOString(),
-          unread: true,
-        },
-      ];
-
-      setEmails(mockEmails);
+      const data = await response.json();
+      setEmails(data.emails);
+    } catch (error) {
+      console.error('Error fetching emails:', error);
+      // Fallback to empty array
+      setEmails([]);
+    } finally {
       setLoading(false);
-    };
+    }
+  };
 
+  useEffect(() => {
+    // Fetch emails on mount
     fetchEmails();
+
+    // Set up interval to fetch emails every 5 seconds for real-time updates
+    const interval = setInterval(fetchEmails, 5000);
+
+    // Clean up interval on unmount
+    return () => clearInterval(interval);
   }, []);
 
   const handleAction = (action: string, id: string) => {
@@ -116,9 +82,9 @@ export const EmailQueue = () => {
     // In a real app, this would trigger an API call
   };
 
-  const urgentCount = emails.filter(e => e.priority === 'urgent').length;
-  const highCount = emails.filter(e => e.priority === 'high').length;
-  const normalCount = emails.filter(e => e.priority === 'normal').length;
+  const urgentCount = emails?.filter(e => e.priority === 'urgent').length || 0;
+  const highCount = emails?.filter(e => e.priority === 'high').length || 0;
+  const normalCount = emails?.filter(e => e.priority === 'normal').length || 0;
 
   if (loading) {
     return (
@@ -162,7 +128,7 @@ export const EmailQueue = () => {
 
       <div className="space-y-3 max-h-80 overflow-y-auto">
         <AnimatePresence>
-          {emails.map((email) => (
+          {emails?.map((email) => (
             <motion.div
               key={email.id}
               initial={{ opacity: 0, y: 10 }}
@@ -196,7 +162,7 @@ export const EmailQueue = () => {
           ))}
         </AnimatePresence>
 
-        {emails.length === 0 && (
+        {emails && emails.length === 0 && (
           <div className="text-center py-8 text-text-secondary">
             <Mail className="w-12 h-12 mx-auto mb-3 text-border" />
             <p>No emails in queue</p>

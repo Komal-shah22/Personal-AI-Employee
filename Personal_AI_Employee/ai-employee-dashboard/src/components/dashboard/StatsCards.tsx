@@ -59,27 +59,79 @@ const StatCard = ({ title, value, change, changeType, icon, trendData }: StatCar
 
 export const StatsCards = () => {
   const [stats, setStats] = useState([
-    { title: 'Pending Tasks', value: 15, change: 12, changeType: 'positive' as const, icon: <Clock className="w-5 h-5" />, trendData: [65, 59, 80, 81, 56, 55, 40] },
-    { title: 'In Progress', value: 8, change: -5, changeType: 'negative' as const, icon: <Play className="w-5 h-5" />, trendData: [28, 48, 40, 19, 86, 27, 90] },
-    { title: 'Completed', value: 142, change: 23, changeType: 'positive' as const, icon: <CheckCircle2 className="w-5 h-5" />, trendData: [12, 19, 3, 5, 2, 3, 20] },
-    { title: 'Total Tasks', value: 165, change: 15, changeType: 'positive' as const, icon: <BarChart3 className="w-5 h-5" />, trendData: [45, 55, 48, 52, 60, 58, 65] },
+    { title: 'Pending Tasks', value: 0, change: 0, changeType: 'positive' as const, icon: <Clock className="w-5 h-5" />, trendData: [65, 59, 80, 81, 56, 55, 40] },
+    { title: 'In Progress', value: 0, change: 0, changeType: 'positive' as const, icon: <Play className="w-5 h-5" />, trendData: [28, 48, 40, 19, 86, 27, 90] },
+    { title: 'Completed', value: 0, change: 0, changeType: 'positive' as const, icon: <CheckCircle2 className="w-5 h-5" />, trendData: [12, 19, 3, 5, 2, 3, 20] },
+    { title: 'Total Tasks', value: 0, change: 0, changeType: 'positive' as const, icon: <BarChart3 className="w-5 h-5" />, trendData: [45, 55, 48, 52, 60, 58, 65] },
   ]);
 
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    // Simulate API call to fetch stats
-    const fetchStats = async () => {
+  const fetchStats = async () => {
+    try {
       setLoading(true);
-      // Simulate API delay
-      await new Promise(resolve => setTimeout(resolve, 800));
+      const response = await fetch('/api/stats');
+      if (!response.ok) throw new Error('Failed to fetch stats');
 
-      // In a real app, this would come from an API
-      // For now, we'll keep the mock data
+      const data = await response.json();
+
+      setStats([
+        {
+          title: 'Pending Tasks',
+          value: data.pending,
+          change: data.trends?.pendingChange || 0,
+          changeType: (data.trends?.pendingChange || 0) >= 0 ? 'positive' : 'negative' as const,
+          icon: <Clock className="w-5 h-5" />,
+          trendData: [65, 59, 80, 81, 56, 55, 40]
+        },
+        {
+          title: 'In Progress',
+          value: data.inProgress,
+          change: data.trends?.inProgressChange || 0,
+          changeType: (data.trends?.inProgressChange || 0) >= 0 ? 'positive' : 'negative' as const,
+          icon: <Play className="w-5 h-5" />,
+          trendData: [28, 48, 40, 19, 86, 27, 90]
+        },
+        {
+          title: 'Completed',
+          value: data.completed,
+          change: data.trends?.completedChange || 0,
+          changeType: (data.trends?.completedChange || 0) >= 0 ? 'positive' : 'negative' as const,
+          icon: <CheckCircle2 className="w-5 h-5" />,
+          trendData: [12, 19, 3, 5, 2, 3, 20]
+        },
+        {
+          title: 'Total Tasks',
+          value: data.total,
+          change: data.trends?.totalChange || 0,
+          changeType: (data.trends?.totalChange || 0) >= 0 ? 'positive' : 'negative' as const,
+          icon: <BarChart3 className="w-5 h-5" />,
+          trendData: [45, 55, 48, 52, 60, 58, 65]
+        },
+      ]);
+    } catch (error) {
+      console.error('Error fetching stats:', error);
+      // Set default values in case of error
+      setStats([
+        { title: 'Pending Tasks', value: 0, change: 0, changeType: 'positive' as const, icon: <Clock className="w-5 h-5" />, trendData: [65, 59, 80, 81, 56, 55, 40] },
+        { title: 'In Progress', value: 0, change: 0, changeType: 'positive' as const, icon: <Play className="w-5 h-5" />, trendData: [28, 48, 40, 19, 86, 27, 90] },
+        { title: 'Completed', value: 0, change: 0, changeType: 'positive' as const, icon: <CheckCircle2 className="w-5 h-5" />, trendData: [12, 19, 3, 5, 2, 3, 20] },
+        { title: 'Total Tasks', value: 0, change: 0, changeType: 'positive' as const, icon: <BarChart3 className="w-5 h-5" />, trendData: [45, 55, 48, 52, 60, 58, 65] },
+      ]);
+    } finally {
       setLoading(false);
-    };
+    }
+  };
 
+  useEffect(() => {
+    // Fetch stats on mount
     fetchStats();
+
+    // Set up interval to fetch stats every 5 seconds for real-time updates
+    const interval = setInterval(fetchStats, 5000);
+
+    // Clean up interval on unmount
+    return () => clearInterval(interval);
   }, []);
 
   if (loading) {

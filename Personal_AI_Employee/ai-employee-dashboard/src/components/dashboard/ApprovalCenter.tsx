@@ -47,48 +47,35 @@ export const ApprovalCenter = () => {
   const [approvals, setApprovals] = useState<ApprovalItem[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    const fetchApprovals = async () => {
+  const fetchApprovals = async () => {
+    try {
       setLoading(true);
 
-      try {
-        const response = await fetch('/api/approvals');
-        if (!response.ok) {
-          throw new Error('Failed to fetch approvals');
-        }
-
-        const data = await response.json();
-        setApprovals(data);
-      } catch (error) {
-        console.error('Error fetching approvals:', error);
-        // Fallback to mock data if API fails
-        const mockApprovals: ApprovalItem[] = [
-          {
-            id: '1',
-            title: 'New Vendor Contract',
-            description: 'Contract with TechCorp for cloud services renewal',
-            status: 'pending',
-            requestedBy: 'Sarah Johnson',
-            requestedAt: new Date(Date.now() - 1000 * 60 * 60 * 2).toISOString(),
-            expiresAt: new Date(Date.now() + 1000 * 60 * 60 * 24 * 3).toISOString(),
-          },
-          {
-            id: '2',
-            title: 'Marketing Budget Increase',
-            description: 'Request to increase Q1 marketing budget by 15%',
-            status: 'pending',
-            requestedBy: 'Mike Chen',
-            requestedAt: new Date(Date.now() - 1000 * 60 * 60 * 5).toISOString(),
-            expiresAt: new Date(Date.now() + 1000 * 60 * 60 * 24 * 1).toISOString(),
-          },
-        ];
-        setApprovals(mockApprovals);
-      } finally {
-        setLoading(false);
+      const response = await fetch('/api/approvals');
+      if (!response.ok) {
+        throw new Error('Failed to fetch approvals');
       }
-    };
 
+      const data = await response.json();
+      setApprovals(data);
+    } catch (error) {
+      console.error('Error fetching approvals:', error);
+      // Fallback to empty array if API fails
+      setApprovals([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    // Fetch approvals on mount
     fetchApprovals();
+
+    // Set up interval to fetch approvals every 5 seconds for real-time updates
+    const interval = setInterval(fetchApprovals, 5000);
+
+    // Clean up interval on unmount
+    return () => clearInterval(interval);
   }, []);
 
   const handleApprove = async (id: string) => {
@@ -137,7 +124,7 @@ export const ApprovalCenter = () => {
     }
   };
 
-  const pendingApprovals = approvals.filter(a => a.status === 'pending');
+  const pendingApprovals = approvals?.filter(a => a.status === 'pending') || [];
 
   if (loading) {
     return (

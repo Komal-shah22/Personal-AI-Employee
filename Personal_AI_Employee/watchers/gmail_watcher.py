@@ -12,6 +12,8 @@ import base64
 from pathlib import Path
 from datetime import datetime
 import json
+import subprocess
+import sys
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
@@ -284,7 +286,24 @@ thread_id: {email_info.get('threadId', '')}
             f.write(content)
 
         logger.info(f"Created action file: {filepath}")
+
+        # Update dashboard to reflect the new email
+        self.update_dashboard()
+
         return filepath
+
+    def update_dashboard(self):
+        """Update the dashboard to reflect changes"""
+        try:
+            # Run the update-dashboard skill
+            result = subprocess.run([sys.executable, '../.claude/skills/update-dashboard/skill.py'],
+                                  capture_output=True, text=True)
+            if result.returncode == 0:
+                logger.info(f"Dashboard updated successfully after email processing: {result.stdout}")
+            else:
+                logger.error(f"Dashboard update failed: {result.stderr}")
+        except Exception as e:
+            logger.error(f"Error updating dashboard: {e}")
 
     def mark_as_read(self, email_id):
         """Mark an email as read to prevent reprocessing"""

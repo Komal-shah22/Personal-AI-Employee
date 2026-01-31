@@ -17,13 +17,32 @@ export default function DashboardPage() {
   const [lastSync, setLastSync] = useState<Date>(new Date());
   const [isRefreshing, setIsRefreshing] = useState(false);
 
-  const handleRefresh = () => {
+  const handleRefresh = async () => {
     setIsRefreshing(true);
-    setTimeout(() => {
+
+    // Force refresh all data by fetching from APIs
+    try {
+      await Promise.all([
+        fetch('/api/stats', { cache: 'no-store' }),
+        fetch('/api/tasks', { cache: 'no-store' }),
+        fetch('/api/activity', { cache: 'no-store' }),
+      ]);
+    } catch (error) {
+      console.error('Error refreshing data:', error);
+    } finally {
       setLastSync(new Date());
       setIsRefreshing(false);
-    }, 1000);
+    }
   };
+
+  // Set up auto-refresh every 10 seconds
+  useEffect(() => {
+    const interval = setInterval(() => {
+      handleRefresh();
+    }, 10000); // Refresh every 10 seconds
+
+    return () => clearInterval(interval);
+  }, []);
 
   return (
     <div className="min-h-screen bg-background text-text-primary">

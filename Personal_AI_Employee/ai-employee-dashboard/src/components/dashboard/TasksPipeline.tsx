@@ -64,74 +64,40 @@ export const TasksPipeline = () => {
   const [tasks, setTasks] = useState<TaskItem[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    // Simulate API call to fetch tasks
-    const fetchTasks = async () => {
+  const fetchTasks = async () => {
+    try {
       setLoading(true);
 
-      // Simulate API delay
-      await new Promise(resolve => setTimeout(resolve, 500));
+      // Fetch from the API
+      const response = await fetch('/api/tasks');
+      if (!response.ok) throw new Error('Failed to fetch tasks');
 
-      // Mock data - in a real app this would come from an API
-      const mockTasks: TaskItem[] = [
-        {
-          id: '1',
-          title: 'Update customer database',
-          description: 'Clean and update customer records with new contact information',
-          status: 'inbox',
-          priority: 'high',
-          assignee: 'AI Employee',
-          dueDate: new Date(Date.now() + 1000 * 60 * 60 * 24 * 3).toISOString(),
-        },
-        {
-          id: '2',
-          title: 'Process weekly reports',
-          description: 'Compile and analyze weekly sales reports',
-          status: 'inbox',
-          priority: 'medium',
-          assignee: 'AI Employee',
-          dueDate: new Date(Date.now() + 1000 * 60 * 60 * 24 * 1).toISOString(),
-        },
-        {
-          id: '3',
-          title: 'Send newsletter',
-          description: 'Prepare and send monthly company newsletter',
-          status: 'progress',
-          priority: 'medium',
-          assignee: 'AI Employee',
-          dueDate: new Date(Date.now() + 1000 * 60 * 60 * 24 * 5).toISOString(),
-        },
-        {
-          id: '4',
-          title: 'Review vendor contracts',
-          description: 'Review and renew vendor agreements',
-          status: 'review',
-          priority: 'high',
-          assignee: 'AI Employee',
-          dueDate: new Date(Date.now() + 1000 * 60 * 60 * 24 * 7).toISOString(),
-        },
-        {
-          id: '5',
-          title: 'Update inventory system',
-          description: 'Integrate new inventory tracking system',
-          status: 'done',
-          priority: 'low',
-          assignee: 'AI Employee',
-          dueDate: new Date(Date.now() - 1000 * 60 * 60 * 24 * 2).toISOString(),
-        },
-      ];
-
-      setTasks(mockTasks);
+      const data = await response.json();
+      setTasks(data.tasks);
+    } catch (error) {
+      console.error('Error fetching tasks:', error);
+      // Fallback to empty array
+      setTasks([]);
+    } finally {
       setLoading(false);
-    };
+    }
+  };
 
+  useEffect(() => {
+    // Fetch tasks on mount
     fetchTasks();
+
+    // Set up interval to fetch tasks every 5 seconds for real-time updates
+    const interval = setInterval(fetchTasks, 5000);
+
+    // Clean up interval on unmount
+    return () => clearInterval(interval);
   }, []);
 
   const columns = ['inbox', 'progress', 'review', 'done'];
 
   const getTasksByStatus = (status: string) => {
-    return tasks.filter(task => task.status === status);
+    return tasks?.filter(task => task.status === status) || [];
   };
 
   if (loading) {
@@ -174,7 +140,7 @@ export const TasksPipeline = () => {
             </div>
 
             <div className="space-y-3">
-              {getTasksByStatus(column).map((task) => (
+              {(getTasksByStatus(column) || []).map((task) => (
                 <motion.div
                   key={task.id}
                   layout
@@ -213,7 +179,7 @@ export const TasksPipeline = () => {
                 </motion.div>
               ))}
 
-              {getTasksByStatus(column).length === 0 && (
+              {getTasksByStatus(column)?.length === 0 && (
                 <div className="text-center py-4 text-text-secondary text-sm">
                   <p>No tasks</p>
                 </div>

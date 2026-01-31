@@ -16,35 +16,33 @@ export const TaskCompletionChart = () => {
   const [data, setData] = useState<ChartDataPoint[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    // Simulate API call to fetch chart data
-    const fetchData = async () => {
+  const fetchChartData = async () => {
+    try {
       setLoading(true);
 
-      // Simulate API delay
-      await new Promise(resolve => setTimeout(resolve, 500));
+      const response = await fetch('/api/chart-data');
+      if (!response.ok) throw new Error('Failed to fetch chart data');
 
-      // Generate mock data for the last 7 days
-      const mockData: ChartDataPoint[] = [];
-      const today = new Date();
-
-      for (let i = 6; i >= 0; i--) {
-        const date = new Date(today);
-        date.setDate(date.getDate() - i);
-
-        mockData.push({
-          date: format(date, 'MMM dd'),
-          completed: Math.floor(Math.random() * 10) + 5,
-          pending: Math.floor(Math.random() * 5) + 2,
-          inProgress: Math.floor(Math.random() * 8) + 3,
-        });
-      }
-
-      setData(mockData);
+      const chartData = await response.json();
+      setData(chartData);
+    } catch (error) {
+      console.error('Error fetching chart data:', error);
+      // Fallback to empty array if API fails
+      setData([]);
+    } finally {
       setLoading(false);
-    };
+    }
+  };
 
-    fetchData();
+  useEffect(() => {
+    // Fetch chart data on mount
+    fetchChartData();
+
+    // Set up interval to fetch chart data every 10 seconds for real-time updates
+    const interval = setInterval(fetchChartData, 10000);
+
+    // Clean up interval on unmount
+    return () => clearInterval(interval);
   }, []);
 
   if (loading) {

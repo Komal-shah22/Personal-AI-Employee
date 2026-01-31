@@ -48,82 +48,35 @@ export const ActivityFeed = () => {
   const [activities, setActivities] = useState<ActivityItem[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    // Simulate API call to fetch activities
-    const fetchActivities = async () => {
+  const fetchActivities = async () => {
+    try {
       setLoading(true);
 
-      // Simulate API delay
-      await new Promise(resolve => setTimeout(resolve, 500));
+      // Fetch from the API
+      const response = await fetch('/api/activity');
+      if (!response.ok) throw new Error('Failed to fetch activities');
 
-      // Mock data - in a real app this would come from an API
-      const mockActivities: ActivityItem[] = [
-        {
-          id: '1',
-          title: 'Email processed',
-          description: 'Processed marketing campaign email',
-          time: new Date(Date.now() - 1000 * 60 * 5).toISOString(),
-          type: 'email',
-          icon: <Mail className="w-4 h-4 text-primary" />,
-        },
-        {
-          id: '2',
-          title: 'Plan created',
-          description: 'Created Q1 marketing strategy plan',
-          time: new Date(Date.now() - 1000 * 60 * 15).toISOString(),
-          type: 'plan',
-          icon: <FileText className="w-4 h-4 text-secondary" />,
-        },
-        {
-          id: '3',
-          title: 'Task completed',
-          description: 'Updated customer database',
-          time: new Date(Date.now() - 1000 * 60 * 30).toISOString(),
-          type: 'task',
-          icon: <CheckCircle className="w-4 h-4 text-accent" />,
-        },
-        {
-          id: '4',
-          title: 'Approval requested',
-          description: 'New vendor contract pending approval',
-          time: new Date(Date.now() - 1000 * 60 * 45).toISOString(),
-          type: 'approval',
-          icon: <Clock className="w-4 h-4 text-warning" />,
-        },
-        {
-          id: '5',
-          title: 'Email sent',
-          description: 'Sent monthly newsletter',
-          time: new Date(Date.now() - 1000 * 60 * 60).toISOString(),
-          type: 'email',
-          icon: <Mail className="w-4 h-4 text-primary" />,
-        },
-      ];
-
-      setActivities(mockActivities);
+      const data = await response.json();
+      setActivities(data.activities);
+    } catch (error) {
+      console.error('Error fetching activities:', error);
+      // Fallback to empty array
+      setActivities([]);
+    } finally {
       setLoading(false);
-    };
+    }
+  };
 
+  useEffect(() => {
+    // Fetch activities on mount
     fetchActivities();
 
-    // Simulate real-time updates
-    const interval = setInterval(() => {
-      if (activities.length > 0) {
-        const newActivity: ActivityItem = {
-          id: (parseInt(activities[0].id) + 1).toString(),
-          title: 'New activity',
-          description: 'A new task was completed',
-          time: new Date().toISOString(),
-          type: ['email', 'task', 'approval', 'plan'][Math.floor(Math.random() * 4)] as any,
-          icon: getActivityIcon(['email', 'task', 'approval', 'plan'][Math.floor(Math.random() * 4)]),
-        };
+    // Set up interval to fetch activities every 5 seconds for real-time updates
+    const interval = setInterval(fetchActivities, 5000);
 
-        setActivities(prev => [newActivity, ...prev.slice(0, 4)]);
-      }
-    }, 10000); // Update every 10 seconds
-
+    // Clean up interval on unmount
     return () => clearInterval(interval);
-  }, [activities.length]);
+  }, []);
 
   if (loading) {
     return (
@@ -167,7 +120,7 @@ export const ActivityFeed = () => {
         ))}
       </AnimatePresence>
 
-      {activities.length === 0 && (
+      {activities?.length === 0 && (
         <div className="text-center py-8 text-text-secondary">
           <p>No recent activity</p>
         </div>
