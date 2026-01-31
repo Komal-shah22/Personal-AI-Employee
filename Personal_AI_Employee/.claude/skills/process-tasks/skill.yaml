@@ -1,0 +1,13 @@
+name: process-tasks
+description: Processes pending tasks from Needs_Action folder and creates execution plans
+version: 1.0.0
+triggers:
+  - "process my tasks"
+  - "process pending actions"
+  - "check needs action"
+  - "process inbox items"
+category: automation
+tags:
+  - task-management
+  - automation
+  - vault

@@ -1,0 +1,4 @@
+[00:58:00] Gmail Watcher started
+[00:58:43] Gmail Watcher started
+[01:04:59] Gmail Watcher stopped by user
+[01:05:09] Gmail Watcher stopped by user

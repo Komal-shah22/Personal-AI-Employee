@@ -1,0 +1,8 @@
+name: request-approval
+description: Creates approval requests for sensitive actions requiring human review
+version: 1.0.0
+category: automation
+tags:
+  - approval
+  - governance
+  - security

@@ -1,0 +1,14 @@
+name: process-emails
+description: Processes incoming emails from Gmail watcher and creates appropriate responses with human approval
+version: 1.0.0
+triggers:
+  - "process my emails"
+  - "handle incoming emails"
+  - "check email responses"
+  - "process email queue"
+category: automation
+tags:
+  - email-processing
+  - automation
+  - communication
+  - approval-workflow

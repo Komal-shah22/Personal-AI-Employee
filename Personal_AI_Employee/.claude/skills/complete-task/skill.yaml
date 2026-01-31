@@ -1,0 +1,13 @@
+name: complete-task
+description: Marks a task as completed and moves it to Done folder
+version: 1.0.0
+triggers:
+  - "complete task [name]"
+  - "mark [name] as done"
+  - "finish task [name]"
+  - "archive task [name]"
+category: automation
+tags:
+  - task-management
+  - completion
+  - archiving

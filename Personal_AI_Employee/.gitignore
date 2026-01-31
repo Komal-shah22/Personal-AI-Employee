@@ -1,0 +1,86 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual environments
+venv/
+env/
+ENV/
+.venv/
+.env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+orchestrator.log
+
+# Authentication
+token.pickle
+*.pem
+*.key
+*.p12
+*.ovpn
+
+# Sensitive files
+credentials.json
+.env
+
+# User data
+*.csv
+*.json
+*.xml
+*.db
+*.sqlite
+
+# Temporary files
+*.tmp
+*.temp
+tmp/
+temp/
+
+# Cache
+.node_modules
+bower_components
+coverage/
+.pytest_cache/
+.hypothesis/
+
+# Local configuration
+config-local.json
+local-settings.json
+
+# AI Employee Vault (uncomment if you don't want to track the vault content)
+# AI_Employee_Vault/
+
+# Claude Code specific
+.claude/cache/
+.claude/temp/

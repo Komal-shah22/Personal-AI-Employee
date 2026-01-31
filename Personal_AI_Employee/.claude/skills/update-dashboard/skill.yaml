@@ -1,0 +1,14 @@
+name: update-dashboard
+description: Refreshes Dashboard.md with real-time statistics and activity
+version: 1.0.0
+triggers:
+  - "update dashboard"
+  - "refresh dashboard"
+  - "show status"
+  - "system status"
+  - "refresh stats"
+category: automation
+tags:
+  - dashboard
+  - monitoring
+  - statistics
