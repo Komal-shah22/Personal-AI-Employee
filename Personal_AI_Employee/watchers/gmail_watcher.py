@@ -24,8 +24,8 @@ from googleapiclient.errors import HttpError
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Scopes required for Gmail API
-SCOPES = ['https://www.googleapis.com/auth/gmail.readonly']
+# Scopes required for Gmail API - need modify permissions to mark emails as read
+SCOPES = ['https://www.googleapis.com/auth/gmail.modify']
 
 class GmailWatcher:
     def __init__(self, config_path="config.json", credentials_file="credentials.json", check_interval=120):
@@ -295,9 +295,11 @@ thread_id: {email_info.get('threadId', '')}
     def update_dashboard(self):
         """Update the dashboard to reflect changes"""
         try:
-            # Run the update-dashboard skill
-            result = subprocess.run([sys.executable, '../.claude/skills/update-dashboard/skill.py'],
-                                  capture_output=True, text=True)
+            # Run the update-dashboard skill - use the correct path from the project root
+            skill_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                                      '.claude', 'skills', 'update-dashboard', 'skill.py')
+            result = subprocess.run([sys.executable, skill_path],
+                                  capture_output=True, text=True, cwd=os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
             if result.returncode == 0:
                 logger.info(f"Dashboard updated successfully after email processing: {result.stdout}")
             else:
