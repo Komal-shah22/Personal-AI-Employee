@@ -43,8 +43,14 @@ Thumbs.db
 *.log
 orchestrator.log
 
+# Node.js
+node_modules/
+package-lock.json
+.npm/
+
 # Authentication
 token.pickle
+token.json
 *.pem
 *.key
 *.p12
@@ -53,6 +59,12 @@ token.pickle
 # Sensitive files
 credentials.json
 .env
+.processed_ids.json
+.whatsapp_processed.json
+
+# WhatsApp sessions (contains login credentials)
+sessions/
+sessions/whatsapp/
 
 # User data
 *.csv
@@ -78,9 +90,22 @@ coverage/
 config-local.json
 local-settings.json
 
-# AI Employee Vault (uncomment if you don't want to track the vault content)
-# AI_Employee_Vault/
+# AI Employee Vault - Exclude logs and sensitive data
+AI_Employee_Vault/Logs/*.json
+AI_Employee_Vault/Logs/*.txt
+AI_Employee_Vault/Logs/*.log
 
 # Claude Code specific
 .claude/cache/
 .claude/temp/
+
+# Dashboard build files
+ai-employee-dashboard/.next/
+ai-employee-dashboard/out/
+ai-employee-dashboard/.env.local
+ai-employee-dashboard/tsconfig.tsbuildinfo
+
+# Test files and temporary data
+test_*.py
+*_test.py
+*.test.js
