@@ -1,0 +1,70 @@
+name: post-social
+version: 1.0.0
+description: Automates social media posting across platforms (Facebook, Instagram, Twitter)
+author: Personal AI Employee
+category: automation
+tags: [social, facebook, instagram, twitter, marketing, automation]
+
+inputs:
+  - name: platform
+    type: string
+    required: false
+    description: Target platform (facebook, instagram, twitter, or auto)
+    default: "auto"
+  - name: caption
+    type: string
+    required: false
+    description: Post caption or content
+  - name: hashtags
+    type: array
+    required: false
+    description: Array of hashtags to include
+    items:
+      type: string
+
+outputs:
+  - name: status
+    type: string
+    description: Success or failure status
+  - name: processed_count
+    type: integer
+    description: Number of posts processed
+  - name: posts
+    type: array
+    description: Details of processed posts
+    items:
+      type: object
+
+permissions:
+  - file_system: read_write
+  - network: outbound  # For MCP server communication
+
+dependencies:
+  - python: ">=3.8"
+  - packages:
+    - pyyaml
+
+examples:
+  - description: Post to all platforms
+    command: claude skill post-social
+  - description: Post specific content to Instagram
+    command: claude skill post-social --platform instagram --caption "Check out our new product!"
+
+triggers:
+  - file_pattern: "**/Needs_Action/SOCIAL_*.md"
+  - file_pattern: "**/Needs_Action/FACEBOOK_*.md"
+  - file_pattern: "**/Needs_Action/INSTAGRAM_*.md"
+  - file_pattern: "**/Needs_Action/TWITTER_*.md"
+
+schedule:
+  - cron: "0 9 * * *"  # Daily at 9 AM
+  - cron: "0 18 * * *" # Daily at 6 PM
+
+documentation:
+  usage: |
+    This skill automates social media posting by:
+    1. Finding social media posts in Needs_Action folder
+    2. Processing them based on metadata
+    3. Posting to specified platforms
+    4. Moving processed files to Done folder
+    5. Updating dashboard statistics

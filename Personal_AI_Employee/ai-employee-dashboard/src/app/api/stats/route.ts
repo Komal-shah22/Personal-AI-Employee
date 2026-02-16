@@ -3,7 +3,17 @@ import path from 'path';
 import { countVaultFiles } from '@/lib/vault-reader';
 
 // Store historical data in memory for trend calculation (in production, you'd use a database)
-let historicalData: { timestamp: number; stats: { pending: number; inProgress: number; completed: number; total: number } }[] = [];
+interface HistoricalDataPoint {
+  timestamp: number;
+  stats: {
+    pending: number;
+    inProgress: number;
+    completed: number;
+    total: number;
+  };
+}
+
+let historicalData: HistoricalDataPoint[] = [];
 
 export async function GET() {
   try {
@@ -28,7 +38,7 @@ export async function GET() {
 
     // Keep only the last hour of data to prevent memory issues
     const oneHourAgo = now - (60 * 60 * 1000);
-    historicalData = historicalData.filter(item => item.timestamp > oneHourAgo);
+    historicalData = historicalData.filter((item: HistoricalDataPoint) => item.timestamp > oneHourAgo);
 
     // Calculate trends based on historical data
     const trends = calculateTrends(historicalData, currentStats);
@@ -49,7 +59,7 @@ export async function GET() {
   }
 }
 
-function calculateTrends(historicalData: typeof historicalData, currentStats: { pending: number; inProgress: number; completed: number; total: number }) {
+function calculateTrends(historicalData: HistoricalDataPoint[], currentStats: { pending: number; inProgress: number; completed: number; total: number }) {
   if (historicalData.length < 2) {
     // If not enough historical data, return neutral trends
     return {
@@ -62,7 +72,7 @@ function calculateTrends(historicalData: typeof historicalData, currentStats: { 
 
   // Get the data from 10 minutes ago or the oldest available data
   const tenMinutesAgo = Date.now() - (10 * 60 * 1000);
-  const pastData = historicalData.find(item => item.timestamp < tenMinutesAgo) || historicalData[0];
+  const pastData = historicalData.find((item: HistoricalDataPoint) => item.timestamp < tenMinutesAgo) || historicalData[0];
 
   const calculateChange = (current: number, past: number) => {
     if (past === 0) return current > 0 ? 100 : 0;

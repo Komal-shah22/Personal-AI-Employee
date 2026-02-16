@@ -1,0 +1,48 @@
+=============================================================================
+COPY-PASTE THESE COMMANDS - Run in PowerShell as Administrator
+=============================================================================
+
+STEP 1: Navigate to project
+----------------------------
+cd E:\hackathon-0\Personal_AI_Employee
+
+
+STEP 2: Run setup script
+-------------------------
+.\scripts\setup_scheduler.ps1
+
+
+STEP 3: Verify tasks created
+-----------------------------
+Get-ScheduledTask | Where-Object {$_.TaskName -like "AI_Employee*"}
+
+
+STEP 4: Test one task
+---------------------
+Start-ScheduledTask -TaskName "AI_Employee_Daily_Summary"
+
+
+STEP 5: Check results
+---------------------
+Get-Content Dashboard.md
+
+
+=============================================================================
+IF YOU GET EXECUTION POLICY ERROR, RUN THIS FIRST:
+=============================================================================
+Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
+
+
+=============================================================================
+EXPECTED OUTPUT FROM STEP 3:
+=============================================================================
+TaskName                        State
+--------                        -----
+AI_Employee_Orchestrator        Ready
+AI_Employee_Daily_Summary       Ready
+AI_Employee_Weekly_Briefing     Ready
+
+
+=============================================================================
+ALL DONE! Your AI Employee is now automated 24/7!
+=============================================================================

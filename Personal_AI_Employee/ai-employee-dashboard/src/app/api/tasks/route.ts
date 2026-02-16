@@ -3,13 +3,23 @@ import path from 'path';
 import { readVaultFiles } from '@/lib/vault-reader';
 import { parseMarkdown, extractFileInfo } from '@/lib/markdown-parser';
 
+interface Task {
+  id: string;
+  title: string;
+  description: string;
+  status: string;
+  priority: string;
+  assignee: string;
+  dueDate: string;
+}
+
 export async function GET() {
   try {
     // Get the vault path from environment variable or default to parent directory
     const vaultPath = process.env.VAULT_PATH || path.join(process.cwd(), '..', 'AI_Employee_Vault');
 
     const folders = ['Needs_Action', 'Plans', 'Done'];
-    const allTasks = [];
+    const allTasks: Task[] = [];
 
     for (const folder of folders) {
       const files = await readVaultFiles(folder, vaultPath);

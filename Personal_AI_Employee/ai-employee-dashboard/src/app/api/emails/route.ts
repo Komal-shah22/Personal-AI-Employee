@@ -34,9 +34,9 @@ export async function GET() {
     });
 
     // Sort by priority and then by time (newest first)
-    const priorityOrder = { urgent: 1, high: 2, normal: 3 };
+    const priorityOrder: Record<string, number> = { urgent: 1, high: 2, normal: 3 };
     emails.sort((a, b) => {
-      const priorityDiff = priorityOrder[a.priority] - priorityOrder[b.priority];
+      const priorityDiff = (priorityOrder[a.priority] || 3) - (priorityOrder[b.priority] || 3);
       if (priorityDiff !== 0) return priorityDiff;
       return new Date(b.time).getTime() - new Date(a.time).getTime();
     });

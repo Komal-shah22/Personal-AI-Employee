@@ -1,188 +1,64 @@
-'use client';
+'use client'
 
-import { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { StatsCards } from '@/components/dashboard/StatsCards';
-import { ActivityFeed } from '@/components/dashboard/ActivityFeed';
-import { EmailQueue } from '@/components/dashboard/EmailQueue';
-import { TasksPipeline } from '@/components/dashboard/TasksPipeline';
-import { ApprovalCenter } from '@/components/dashboard/ApprovalCenter';
-import { TaskCompletionChart } from '@/components/charts/TaskCompletionChart';
-import { Button } from '@/components/ui/button';
-import { RefreshCw, Zap, TrendingUp, Clock, CheckCircle } from 'lucide-react';
-import { formatDistanceToNow } from 'date-fns';
+import { useState } from 'react'
+import Header from '@/components/Header'
+import StatsStrip from '@/components/StatsStrip'
+import ArchitectureDiagram from '@/components/ArchitectureDiagram'
+import LiveStatus from '@/components/LiveStatus'
+import ActivityFeed from '@/components/ActivityFeed'
+import QuickActions from '@/components/QuickActions'
+import ApprovalQueue from '@/components/ApprovalQueue'
+import TierNav from '@/components/TierNav'
+import AgentCard from '@/components/AgentCard'
 
-export default function DashboardPage() {
-  const [lastSync, setLastSync] = useState<Date>(new Date());
-  const [isRefreshing, setIsRefreshing] = useState(false);
+type Tier = 'bronze' | 'silver' | 'gold' | 'platinum'
 
-  const handleRefresh = async () => {
-    setIsRefreshing(true);
-
-    // Force refresh all data by fetching from APIs
-    try {
-      await Promise.all([
-        fetch('/api/stats', { cache: 'no-store' }),
-        fetch('/api/tasks', { cache: 'no-store' }),
-        fetch('/api/activity', { cache: 'no-store' }),
-      ]);
-    } catch (error) {
-      console.error('Error refreshing data:', error);
-    } finally {
-      setLastSync(new Date());
-      setIsRefreshing(false);
-    }
-  };
-
-  // Set up auto-refresh every 10 seconds
-  useEffect(() => {
-    const interval = setInterval(() => {
-      handleRefresh();
-    }, 10000); // Refresh every 10 seconds
-
-    return () => clearInterval(interval);
-  }, []);
+export default function Dashboard() {
+  const [activeTier, setActiveTier] = useState<Tier>('bronze')
 
   return (
-    <div className="min-h-screen bg-background text-text-primary">
+    <main className="container mx-auto px-4 py-8 max-w-7xl">
       {/* Header */}
-      <motion.div
-        initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="p-6 border-b border-border bg-surface"
-      >
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold">Welcome back! 👋</h1>
-            <p className="text-text-secondary mt-1">Here's what's happening with your AI employee today.</p>
-          </div>
-          <div className="flex items-center gap-3">
-            <div className="text-sm text-text-secondary flex items-center gap-1">
-              <Clock className="w-4 h-4" />
-              Last sync: {formatDistanceToNow(lastSync, { addSuffix: true })}
-            </div>
-            <Button
-              variant="outline"
-              onClick={handleRefresh}
-              disabled={isRefreshing}
-              className="gap-2"
-            >
-              <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
-              Refresh
-            </Button>
-          </div>
-        </div>
-      </motion.div>
+      <Header />
 
-      {/* Main Content */}
-      <div className="p-6 space-y-6">
-        {/* Stats Cards */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.1 }}
-        >
-          <StatsCards />
-        </motion.div>
-
-        {/* Charts and Activity */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2 }}
-          >
-            <Card className="glass-card h-full">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <TrendingUp className="w-5 h-5 text-accent" />
-                  Performance Overview
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <TaskCompletionChart />
-              </CardContent>
-            </Card>
-          </motion.div>
-
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.3 }}
-          >
-            <Card className="glass-card h-full">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Zap className="w-5 h-5 text-warning" />
-                  Recent Activity
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <ActivityFeed />
-              </CardContent>
-            </Card>
-          </motion.div>
-        </div>
-
-        {/* Email Queue and Tasks Pipeline */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.4 }}
-          >
-            <Card className="glass-card h-full">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Zap className="w-5 h-5 text-primary" />
-                  Email Queue
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <EmailQueue />
-              </CardContent>
-            </Card>
-          </motion.div>
-
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.5 }}
-          >
-            <Card className="glass-card h-full">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <CheckCircle className="w-5 h-5 text-success" />
-                  Active Tasks Pipeline
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <TasksPipeline />
-              </CardContent>
-            </Card>
-          </motion.div>
-        </div>
-
-        {/* Approval Center */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.6 }}
-        >
-          <Card className="glass-card">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Zap className="w-5 h-5 text-secondary" />
-                Approval Center
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <ApprovalCenter />
-            </CardContent>
-          </Card>
-        </motion.div>
+      {/* Stats Strip */}
+      <div className="mt-8">
+        <StatsStrip />
       </div>
-    </div>
-  );
+
+      {/* System Architecture */}
+      <div className="mt-8">
+        <ArchitectureDiagram />
+      </div>
+
+      {/* Live Control Panel */}
+      <div className="mt-8 grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Live Status - Takes 2 columns */}
+        <div className="lg:col-span-2">
+          <LiveStatus />
+        </div>
+
+        {/* Activity Feed - Takes 1 column */}
+        <div className="lg:col-span-1">
+          <ActivityFeed />
+        </div>
+      </div>
+
+      {/* Quick Actions & Approval Queue */}
+      <div className="mt-8 grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <QuickActions />
+        <ApprovalQueue />
+      </div>
+
+      {/* Tier Navigation */}
+      <div className="mt-12">
+        <TierNav activeTier={activeTier} onTierChange={setActiveTier} />
+      </div>
+
+      {/* Agent Cards by Tier */}
+      <div className="mt-8">
+        <AgentCard tier={activeTier} />
+      </div>
+    </main>
+  )
 }

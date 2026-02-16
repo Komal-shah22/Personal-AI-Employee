@@ -1,0 +1,122 @@
+version: '3.8'
+
+services:
+  ai-employee:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+    container_name: ai_employee_cloud
+    restart: always
+
+    # Environment variables - MUST be set via .env file or Oracle Vault
+    # NEVER commit actual values to Git
+    environment:
+      # Core Configuration
+      - NODE_ENV=production
+      - TZ=UTC
+
+      # Claude API (REQUIRED)
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+
+      # Email MCP (if using)
+      - GMAIL_CLIENT_ID=${GMAIL_CLIENT_ID:-}
+      - GMAIL_CLIENT_SECRET=${GMAIL_CLIENT_SECRET:-}
+      - GMAIL_REFRESH_TOKEN=${GMAIL_REFRESH_TOKEN:-}
+
+      # Social Media MCP (if using)
+      - TWITTER_BEARER_TOKEN=${TWITTER_BEARER_TOKEN:-}
+      - TWITTER_API_KEY=${TWITTER_API_KEY:-}
+      - TWITTER_API_SECRET=${TWITTER_API_SECRET:-}
+      - TWITTER_ACCESS_TOKEN=${TWITTER_ACCESS_TOKEN:-}
+      - TWITTER_ACCESS_SECRET=${TWITTER_ACCESS_SECRET:-}
+      - FB_ACCESS_TOKEN=${FB_ACCESS_TOKEN:-}
+      - FB_PAGE_ID=${FB_PAGE_ID:-}
+      - INSTAGRAM_USER_ID=${INSTAGRAM_USER_ID:-}
+      - INSTAGRAM_ACCESS_TOKEN=${INSTAGRAM_ACCESS_TOKEN:-}
+
+      # Odoo (if using)
+      - ODOO_URL=${ODOO_URL:-}
+      - ODOO_DB=${ODOO_DB:-}
+      - ODOO_API_USER=${ODOO_API_USER:-}
+      - ODOO_API_PASSWORD=${ODOO_API_PASSWORD:-}
+
+      # Security
+      - DRY_RUN=${DRY_RUN:-true}
+
+      # IMPORTANT: WhatsApp and Payments are LOCAL ONLY
+      # DO NOT set these in cloud deployment
+      # - WHATSAPP_* (never in cloud)
+      # - PAYMENT_* (never in cloud)
+
+    # Persistent volumes
+    volumes:
+      # Vault data (persisted across restarts)
+      - vault-data:/app/AI_Employee_Vault
+
+      # Logs (persisted)
+      - logs-data:/app/AI_Employee_Vault/Logs
+
+      # Plans and briefings (persisted)
+      - plans-data:/app/AI_Employee_Vault/Plans
+      - briefings-data:/app/AI_Employee_Vault/Briefings
+
+      # IMPORTANT: Sessions directory is NOT mounted
+      # WhatsApp sessions must stay LOCAL only
+
+    # Resource limits (Oracle Free Tier: 1 OCPU, 6GB RAM)
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 2G
+        reservations:
+          cpus: '0.25'
+          memory: 512M
+
+    # Health check
+    healthcheck:
+      test: ["CMD", "python", "-c", "import os; exit(0 if os.path.exists('/app/AI_Employee_Vault/Logs') else 1)"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+    # Logging configuration
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+    # Network
+    networks:
+      - ai-employee-network
+
+# Named volumes for persistence
+volumes:
+  vault-data:
+    driver: local
+  logs-data:
+    driver: local
+  plans-data:
+    driver: local
+  briefings-data:
+    driver: local
+
+# Network
+networks:
+  ai-employee-network:
+    driver: bridge
+
+# SECURITY NOTES:
+#
+# 1. NEVER commit .env file with actual credentials
+# 2. Use Oracle Vault or environment variables for secrets
+# 3. WhatsApp sessions MUST stay on local machine only
+# 4. Payment MCP MUST stay on local machine only
+# 5. Set DRY_RUN=true until fully tested
+# 6. Review all environment variables before deployment
+# 7. Use strong passwords for all services
+# 8. Enable firewall rules (only SSH and HTTPS)
+# 9. Regular backups of vault-data volume
+# 10. Monitor logs for suspicious activity

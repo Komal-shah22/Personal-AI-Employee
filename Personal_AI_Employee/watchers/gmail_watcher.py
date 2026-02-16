@@ -1,368 +1,369 @@
 """
-Gmail Watcher for Personal AI Employee
-
-Monitors Gmail for new messages and creates action items in the Needs_Action folder.
+Gmail Watcher - Monitors Gmail for unread important emails
+Creates action items in AI_Employee_Vault/Needs_Action/
 """
 
+import os
+import json
 import time
 import logging
-import os
-import pickle
-import base64
-from pathlib import Path
 from datetime import datetime
-import json
-import subprocess
-import sys
+from pathlib import Path
+from typing import List, Dict, Optional
+import base64
+import re
+
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
+from dotenv import load_dotenv
 
-# Configure logging
-logging.basicConfig(level=logging.INFO)
+# Load environment variables
+load_dotenv()
+
+# Gmail API scopes
+SCOPES = ['https://www.googleapis.com/auth/gmail.readonly']
+
+# Configuration
+CHECK_INTERVAL = 120  # seconds
+PROCESSED_IDS_FILE = '.processed_ids.json'
+LOG_DIR = Path('AI_Employee_Vault/Logs')
+ACTION_DIR = Path('AI_Employee_Vault/Needs_Action')
+TOKEN_FILE = 'token.json'
+
+# Setup logging
+LOG_DIR.mkdir(parents=True, exist_ok=True)
+log_file = LOG_DIR / 'gmail_watcher.log'
+
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler(log_file),
+        logging.StreamHandler()
+    ]
+)
 logger = logging.getLogger(__name__)
 
-# Scopes required for Gmail API - need modify permissions to mark emails as read
-SCOPES = ['https://www.googleapis.com/auth/gmail.modify']
 
 class GmailWatcher:
-    def __init__(self, config_path="config.json", credentials_file="credentials.json", check_interval=120):
-        self.config = self.load_config(config_path)
-        self.credentials_file = credentials_file
-        self.check_interval = check_interval
+    def __init__(self):
+        self.service = None
+        self.processed_ids = self.load_processed_ids()
+        self.retry_delay = 1  # Initial retry delay in seconds
+        self.max_retry_delay = 60
 
-        # Use the configured paths from config.json
-        self.needs_action_dir = Path(self.config['directories']['needs_action'])
-        self.logs_dir = Path(self.config['directories']['logs'])
+    def load_processed_ids(self) -> set:
+        """Load previously processed email IDs"""
+        if os.path.exists(PROCESSED_IDS_FILE):
+            try:
+                with open(PROCESSED_IDS_FILE, 'r') as f:
+                    data = json.load(f)
+                    return set(data.get('processed_ids', []))
+            except Exception as e:
+                logger.error(f"Error loading processed IDs: {e}")
+                return set()
+        return set()
 
-        # Create directories if they don't exist
-        self.needs_action_dir.mkdir(parents=True, exist_ok=True)
-        self.logs_dir.mkdir(parents=True, exist_ok=True)
+    def save_processed_ids(self):
+        """Save processed email IDs to file"""
+        try:
+            with open(PROCESSED_IDS_FILE, 'w') as f:
+                json.dump({
+                    'processed_ids': list(self.processed_ids),
+                    'last_updated': datetime.now().isoformat()
+                }, f, indent=2)
+        except Exception as e:
+            logger.error(f"Error saving processed IDs: {e}")
 
-        # Initialize Gmail service
-        self.service = self.initialize_gmail_service()
-        self.processed_ids = set()
-
-        logger.info("Gmail Watcher initialized")
-
-    def load_config(self, config_path):
-        """Load configuration from JSON file"""
-        with open(config_path, 'r') as f:
-            return json.load(f)
-
-    def initialize_gmail_service(self):
-        """Initialize Gmail API service with OAuth2 authentication"""
+    def authenticate(self) -> bool:
+        """Authenticate with Gmail API using OAuth2"""
         creds = None
 
-        # Token file stores the user's access and refresh tokens
-        token_path = Path('token.pickle')
+        # Load existing token
+        if os.path.exists(TOKEN_FILE):
+            try:
+                creds = Credentials.from_authorized_user_file(TOKEN_FILE, SCOPES)
+            except Exception as e:
+                logger.error(f"Error loading credentials: {e}")
 
-        # Load existing token if available
-        if token_path.exists():
-            with open(token_path, 'rb') as token:
-                creds = pickle.load(token)
-
-        # If there are no valid credentials, request authorization
+        # Refresh or get new credentials
         if not creds or not creds.valid:
             if creds and creds.expired and creds.refresh_token:
                 try:
                     creds.refresh(Request())
+                    logger.info("Credentials refreshed successfully")
                 except Exception as e:
-                    logger.error(f"Error refreshing token: {e}")
-                    # Delete the old token file and get a new one
-                    if token_path.exists():
-                        token_path.unlink()
+                    logger.error(f"Error refreshing credentials: {e}")
                     creds = None
 
             if not creds:
-                # Get credentials from the downloaded credentials.json
-                if not Path(self.credentials_file).exists():
-                    raise FileNotFoundError(f"Credentials file {self.credentials_file} not found")
+                try:
+                    # Create credentials.json from environment variables
+                    client_config = {
+                        "installed": {
+                            "client_id": os.getenv('GMAIL_CLIENT_ID'),
+                            "client_secret": os.getenv('GMAIL_CLIENT_SECRET'),
+                            "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+                            "token_uri": "https://oauth2.googleapis.com/token",
+                            "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+                            "redirect_uris": ["http://localhost"]
+                        }
+                    }
 
-                flow = InstalledAppFlow.from_client_secrets_file(
-                    self.credentials_file, SCOPES
-                )
-                creds = flow.run_local_server(port=0)
+                    flow = InstalledAppFlow.from_client_config(client_config, SCOPES)
+                    creds = flow.run_local_server(port=0)
+                    logger.info("New credentials obtained successfully")
+                except Exception as e:
+                    logger.error(f"Error obtaining new credentials: {e}")
+                    return False
 
-            # Save the credentials for next run
-            with open(token_path, 'wb') as token:
-                pickle.dump(creds, token)
+            # Save credentials
+            try:
+                with open(TOKEN_FILE, 'w') as token:
+                    token.write(creds.to_json())
+            except Exception as e:
+                logger.error(f"Error saving credentials: {e}")
 
-        # Build the Gmail service
-        service = build('gmail', 'v1', credentials=creds)
-        return service
-
-    def check_for_new_emails(self):
-        """Check for new Gmail messages using the API"""
         try:
-            # Query for unread emails
+            self.service = build('gmail', 'v1', credentials=creds)
+            logger.info("Gmail API service initialized successfully")
+            return True
+        except Exception as e:
+            logger.error(f"Error building Gmail service: {e}")
+            return False
+
+    def exponential_backoff(self):
+        """Implement exponential backoff for retries"""
+        time.sleep(self.retry_delay)
+        self.retry_delay = min(self.retry_delay * 2, self.max_retry_delay)
+        logger.info(f"Backing off for {self.retry_delay}s")
+
+    def reset_retry_delay(self):
+        """Reset retry delay after successful operation"""
+        self.retry_delay = 1
+
+    def get_unread_important_emails(self) -> List[Dict]:
+        """Fetch unread and important emails from Gmail"""
+        try:
+            # Query for unread AND important emails
+            query = 'is:unread is:important'
+
             results = self.service.users().messages().list(
                 userId='me',
-                q='is:unread'
+                q=query,
+                maxResults=10
             ).execute()
 
             messages = results.get('messages', [])
 
             if not messages:
-                logger.info("No new unread emails found")
+                logger.debug("No unread important emails found")
                 return []
 
-            logger.info(f"Found {len(messages)} new unread emails")
-
-            new_emails = []
-            for msg in messages:
-                message_id = msg['id']
-
-                # Skip if already processed
-                if message_id in self.processed_ids:
-                    continue
-
-                # Get full message details
-                message = self.service.users().messages().get(
-                    userId='me',
-                    id=message_id
-                ).execute()
-
-                # Parse the email
-                email_data = self.parse_email(message)
-                if email_data:
-                    new_emails.append(email_data)
-                    self.processed_ids.add(message_id)
-
-            return new_emails
+            logger.info(f"Found {len(messages)} unread important email(s)")
+            return messages
 
         except HttpError as error:
-            logger.error(f"An error occurred while fetching emails: {error}")
+            logger.error(f"Gmail API error: {error}")
+            self.exponential_backoff()
             return []
         except Exception as e:
-            logger.error(f"Unexpected error while checking emails: {e}")
+            logger.error(f"Unexpected error fetching emails: {e}")
+            self.exponential_backoff()
             return []
 
-    def parse_email(self, message):
-        """Parse email message and extract relevant information"""
+    def get_email_details(self, msg_id: str) -> Optional[Dict]:
+        """Get detailed information about an email"""
         try:
+            message = self.service.users().messages().get(
+                userId='me',
+                id=msg_id,
+                format='full'
+            ).execute()
+
             headers = message['payload']['headers']
 
-            # Extract email headers
-            email_info = {
-                'id': message['id'],
-                'threadId': message['threadId'],
-                'sizeEstimate': message.get('sizeEstimate', 0)
+            # Extract relevant headers
+            subject = next((h['value'] for h in headers if h['name'].lower() == 'subject'), 'No Subject')
+            from_email = next((h['value'] for h in headers if h['name'].lower() == 'from'), 'Unknown')
+            date = next((h['value'] for h in headers if h['name'].lower() == 'date'), '')
+
+            # Get email body
+            body = self.get_email_body(message)
+
+            # Get snippet
+            snippet = message.get('snippet', '')
+
+            return {
+                'id': msg_id,
+                'subject': subject,
+                'from': from_email,
+                'date': date,
+                'body': body,
+                'snippet': snippet
             }
 
-            for header in headers:
-                name = header['name'].lower()
-                value = header['value']
-
-                if name == 'from':
-                    email_info['from'] = value
-                elif name == 'to':
-                    email_info['to'] = value
-                elif name == 'subject':
-                    email_info['subject'] = value
-                elif name == 'date':
-                    email_info['date'] = value
-
-            # Extract email body
-            email_info['body'] = self.extract_body(message)
-            email_info['snippet'] = message.get('snippet', '')
-
-            # Determine priority based on keywords
-            email_info['priority'] = self.determine_priority(email_info)
-
-            return email_info
-
+        except HttpError as error:
+            logger.error(f"Error getting email details for {msg_id}: {error}")
+            return None
         except Exception as e:
-            logger.error(f"Error parsing email {message.get('id', 'unknown')}: {e}")
+            logger.error(f"Unexpected error getting email details: {e}")
             return None
 
-    def extract_body(self, message):
+    def get_email_body(self, message: Dict) -> str:
         """Extract email body from message payload"""
         try:
-            body = ""
-            payload = message.get('payload', {})
-            parts = payload.get('parts', [])
-
-            if not parts:
-                # Email might be plain text
-                if 'body' in payload and 'data' in payload['body']:
-                    body = base64.urlsafe_b64decode(payload['body']['data']).decode('utf-8')
+            if 'parts' in message['payload']:
+                # Multipart message
+                for part in message['payload']['parts']:
+                    if part['mimeType'] == 'text/plain':
+                        data = part['body'].get('data', '')
+                        if data:
+                            return base64.urlsafe_b64decode(data).decode('utf-8')
+                    elif part['mimeType'] == 'text/html':
+                        # Fallback to HTML if no plain text
+                        data = part['body'].get('data', '')
+                        if data:
+                            html = base64.urlsafe_b64decode(data).decode('utf-8')
+                            # Basic HTML stripping
+                            text = re.sub('<[^<]+?>', '', html)
+                            return text
             else:
-                # Process multipart email
-                for part in parts:
-                    if part.get('mimeType') == 'text/plain':
-                        if 'body' in part and 'data' in part['body']:
-                            body = base64.urlsafe_b64decode(part['body']['data']).decode('utf-8')
-                            break
-                    elif part.get('mimeType') == 'text/html' and not body:
-                        # Fallback to HTML if no plain text found
-                        if 'body' in part and 'data' in part['body']:
-                            body = base64.urlsafe_b64decode(part['body']['data']).decode('utf-8')
+                # Simple message
+                data = message['payload']['body'].get('data', '')
+                if data:
+                    return base64.urlsafe_b64decode(data).decode('utf-8')
 
-            return body if body else message.get('snippet', '')
+            return message.get('snippet', '')
 
         except Exception as e:
             logger.error(f"Error extracting email body: {e}")
-            return ""
+            return message.get('snippet', '')
 
-    def determine_priority(self, email_info):
-        """Determine email priority based on keywords"""
-        subject = email_info.get('subject', '').lower()
-        body = email_info.get('body', '').lower()
-        snippet = email_info.get('snippet', '').lower()
+    def sanitize_filename(self, text: str) -> str:
+        """Sanitize text for use in filename"""
+        # Remove or replace invalid filename characters
+        text = re.sub(r'[<>:"/\\|?*]', '_', text)
+        # Limit length
+        return text[:100]
 
-        # Keywords indicating high priority
-        high_priority_keywords = [
-            'urgent', 'asap', 'immediate', 'important', 'critical',
-            'emergency', 'deadline', 'due', 'invoice', 'payment',
-            'billing', 'money', 'financial', 'legal', 'compliance'
-        ]
+    def create_action_item(self, email: Dict):
+        """Create markdown action item for email"""
+        try:
+            ACTION_DIR.mkdir(parents=True, exist_ok=True)
 
-        combined_text = subject + ' ' + body + ' ' + snippet
+            # Create filename
+            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+            safe_subject = self.sanitize_filename(email['subject'])
+            filename = f"EMAIL_{safe_subject}_{timestamp}.md"
+            filepath = ACTION_DIR / filename
 
-        for keyword in high_priority_keywords:
-            if keyword in combined_text:
-                return 'high'
+            # Determine priority based on subject/content
+            priority = 'high' if any(word in email['subject'].lower() for word in ['urgent', 'asap', 'important', 'critical']) else 'normal'
 
-        # Keywords indicating medium priority
-        medium_priority_keywords = [
-            'follow', 'remind', 'meeting', 'schedule', 'appointment',
-            'project', 'report', 'proposal', 'contract', 'agreement'
-        ]
-
-        for keyword in medium_priority_keywords:
-            if keyword in combined_text:
-                return 'medium'
-
-        return 'medium'  # Default priority
-
-    def create_action_file(self, email_info):
-        """Create a Markdown file in the Needs_Action folder for a new email."""
-        # Create a unique filename
-        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-        safe_subject = "".join(c for c in email_info.get('subject', 'untitled') if c.isalnum() or c in (' ', '-', '_')).rstrip()
-        if not safe_subject:
-            safe_subject = "email"
-        filename = f"EMAIL_{safe_subject}_{timestamp}.md"
-        filepath = self.needs_action_dir / filename
-
-        # Create content for the action file
-        content = f"""---
+            # Create markdown content
+            content = f"""---
 type: email
-from: "{email_info.get('from', 'Unknown')}"
-to: "{email_info.get('to', 'Unknown')}"
-subject: "{email_info.get('subject', 'No Subject')}"
-received: "{email_info.get('date', datetime.now().isoformat())}"
-priority: {email_info.get('priority', 'medium')}
+from: {email['from']}
+subject: {email['subject']}
+received: {email['date']}
+priority: {priority}
 status: pending
-email_id: {email_info.get('id', '')}
-thread_id: {email_info.get('threadId', '')}
+email_id: {email['id']}
 ---
 
-# Email from {email_info.get('from', 'Unknown')}
+# Email: {email['subject']}
 
-**Subject:** {email_info.get('subject', 'No Subject')}
-**Date:** {email_info.get('date', datetime.now().isoformat())}
-**Priority:** {email_info.get('priority', 'medium')}
+## From
+{email['from']}
 
-## Email Content
-{email_info.get('body', 'Content not available')}
+## Received
+{email['date']}
 
-## Action Required
-- [ ] Review email content
-- [ ] Determine appropriate response
-- [ ] Respond or forward as needed
-- [ ] Update status when completed
+## Content
+{email['snippet']}
+
+---
+
+## Actions Required
+- [ ] Reply to this email
+- [ ] Forward if necessary
+- [ ] Archive after handling
 
 ## Notes
-- Original email ID: {email_info.get('id', '')}
-- Thread ID: {email_info.get('threadId', '')}
+Add any notes or context here before taking action.
 """
 
-        # Write the file
-        with open(filepath, 'w', encoding='utf-8') as f:
-            f.write(content)
+            # Write to file
+            with open(filepath, 'w', encoding='utf-8') as f:
+                f.write(content)
 
-        logger.info(f"Created action file: {filepath}")
+            logger.info(f"Created action item: {filename}")
 
-        # Update dashboard to reflect the new email
-        self.update_dashboard()
+            # Mark as processed
+            self.processed_ids.add(email['id'])
+            self.save_processed_ids()
 
-        return filepath
-
-    def update_dashboard(self):
-        """Update the dashboard to reflect changes"""
-        try:
-            # Run the update-dashboard skill - use the correct path from the project root
-            skill_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-                                      '.claude', 'skills', 'update-dashboard', 'skill.py')
-            result = subprocess.run([sys.executable, skill_path],
-                                  capture_output=True, text=True, cwd=os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-            if result.returncode == 0:
-                logger.info(f"Dashboard updated successfully after email processing: {result.stdout}")
-            else:
-                logger.error(f"Dashboard update failed: {result.stderr}")
         except Exception as e:
-            logger.error(f"Error updating dashboard: {e}")
+            logger.error(f"Error creating action item for email {email['id']}: {e}")
 
-    def mark_as_read(self, email_id):
-        """Mark an email as read to prevent reprocessing"""
-        try:
-            # Modify the message to remove the 'UNREAD' label
-            self.service.users().messages().modify(
-                userId='me',
-                id=email_id,
-                body={'removeLabelIds': ['UNREAD']}
-            ).execute()
-            logger.debug(f"Marked email {email_id} as read")
-        except Exception as e:
-            logger.error(f"Error marking email {email_id} as read: {e}")
+    def process_emails(self):
+        """Main processing loop for emails"""
+        messages = self.get_unread_important_emails()
+
+        new_emails = 0
+        for msg in messages:
+            msg_id = msg['id']
+
+            # Skip if already processed
+            if msg_id in self.processed_ids:
+                logger.debug(f"Skipping already processed email: {msg_id}")
+                continue
+
+            # Get email details
+            email = self.get_email_details(msg_id)
+            if email:
+                self.create_action_item(email)
+                new_emails += 1
+
+        if new_emails > 0:
+            logger.info(f"Processed {new_emails} new email(s)")
+
+        # Reset retry delay on successful processing
+        self.reset_retry_delay()
 
     def run(self):
-        """Main execution loop"""
-        logger.info("Starting Gmail Watcher")
+        """Main run loop"""
+        logger.info("Gmail Watcher started")
+        logger.info(f"Checking every {CHECK_INTERVAL} seconds for unread important emails")
 
-        # Log startup
-        log_path = self.logs_dir / f"{datetime.now().strftime('%Y-%m-%d')}.txt"
-        with open(log_path, 'a', encoding='utf-8') as log_file:
-            log_file.write(f"[{datetime.now().strftime('%H:%M:%S')}] Gmail Watcher started\n")
+        # Authenticate
+        if not self.authenticate():
+            logger.error("Failed to authenticate with Gmail API")
+            return
 
+        # Main loop
         while True:
             try:
-                new_emails = self.check_for_new_emails()
-
-                for email_info in new_emails:
-                    # Create action file for the email
-                    self.create_action_file(email_info)
-
-                    # Mark the email as read to prevent reprocessing
-                    self.mark_as_read(email_info['id'])
-
-                # Wait before checking again
-                time.sleep(self.check_interval)
+                logger.debug("Checking for new emails...")
+                self.process_emails()
+                time.sleep(CHECK_INTERVAL)
 
             except KeyboardInterrupt:
                 logger.info("Gmail Watcher stopped by user")
-
-                # Log shutdown
-                log_path = self.logs_dir / f"{datetime.now().strftime('%Y-%m-%d')}.txt"
-                with open(log_path, 'a', encoding='utf-8') as log_file:
-                    log_file.write(f"[{datetime.now().strftime('%H:%M:%S')}] Gmail Watcher stopped by user\n")
-
                 break
             except Exception as e:
-                logger.error(f"Error in Gmail Watcher: {e}")
-
-                # Log error
-                log_path = self.logs_dir / f"{datetime.now().strftime('%Y-%m-%d')}.txt"
-                with open(log_path, 'a', encoding='utf-8') as log_file:
-                    log_file.write(f"[{datetime.now().strftime('%H:%M:%S')}] Gmail Watcher error: {str(e)}\n")
-
-                time.sleep(self.check_interval)
+                logger.error(f"Unexpected error in main loop: {e}")
+                self.exponential_backoff()
 
 
-if __name__ == "__main__":
+def main():
     watcher = GmailWatcher()
     watcher.run()
+
+
+if __name__ == '__main__':
+    main()

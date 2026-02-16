@@ -1,0 +1,68 @@
+name: generate-reports
+version: 1.0.0
+description: Generates business intelligence reports and CEO briefings from vault data
+author: Personal AI Employee
+category: analytics
+tags: [analytics, reports, business, intelligence, ceo, briefing, metrics]
+
+inputs:
+  - name: report_type
+    type: string
+    required: false
+    description: Type of report to generate (daily, weekly, monthly, all)
+    default: "all"
+  - name: period
+    type: string
+    required: false
+    description: Time period for analysis (daily, weekly, monthly)
+    default: "weekly"
+  - name: include_revenue
+    type: boolean
+    required: false
+    description: Whether to include revenue analysis
+    default: true
+  - name: include_performance
+    type: boolean
+    required: false
+    description: Whether to include task performance metrics
+    default: true
+
+outputs:
+  - name: status
+    type: string
+    description: Success or failure status
+  - name: reports_generated
+    type: array
+    description: List of report types generated
+  - name: reports_saved_to
+    type: string
+    description: Directory where reports were saved
+
+permissions:
+  - file_system: read_write
+  - network: none
+
+dependencies:
+  - python: ">=3.8"
+
+examples:
+  - description: Generate all reports
+    command: claude skill generate-reports
+  - description: Generate weekly CEO briefing
+    command: claude skill generate-reports --report_type weekly
+  - description: Generate performance metrics only
+    command: claude skill generate-reports --include_revenue false
+
+triggers:
+  - schedule: "0 7 * * 1"  # Every Monday morning at 7 AM
+  - schedule: "0 8 * * *"  # Daily at 8 AM
+  - file_pattern: "**/Needs_Action/REPORT_*.md"
+
+documentation:
+  usage: |
+    This skill generates comprehensive business intelligence reports by:
+    1. Analyzing data from the vault directories
+    2. Calculating key metrics and performance indicators
+    3. Creating executive briefings and analytics reports
+    4. Saving reports to the Reports folder
+    5. Updating dashboard statistics

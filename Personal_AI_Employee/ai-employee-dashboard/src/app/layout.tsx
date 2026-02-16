@@ -1,34 +1,38 @@
-import './globals.css';
-import type { Metadata } from 'next';
-import { Inter } from 'next/font/google';
-import { ThemeProvider } from '@/components/providers/theme-provider';
-import { Toaster } from 'sonner';
-
-const inter = Inter({ subsets: ['latin'] });
+import './globals.css'
+import type { Metadata } from 'next'
+import { Toaster } from 'sonner'
 
 export const metadata: Metadata = {
-  title: 'AI Employee Dashboard',
-  description: 'Enterprise-grade dashboard for your Personal AI Employee',
-};
+  title: 'Personal AI Employee Dashboard',
+  description: 'Production-ready dashboard for managing AI agents and workflows',
+  icons: {
+    icon: '/favicon.ico',
+  },
+}
 
 export default function RootLayout({
   children,
 }: {
-  children: React.ReactNode;
+  children: React.ReactNode
 }) {
   return (
-    <html lang="en" suppressHydrationWarning>
-      <body className={inter.className}>
-        <ThemeProvider
-          attribute="class"
-          defaultTheme="dark"
-          enableSystem
-          disableTransitionOnChange
-        >
+    <html lang="en">
+      <body className="antialiased">
+        <div className="min-h-screen animated-gradient grid-pattern">
           {children}
-          <Toaster position="top-right" />
-        </ThemeProvider>
+        </div>
+        <Toaster
+          position="top-right"
+          theme="dark"
+          toastOptions={{
+            style: {
+              background: 'var(--surface)',
+              border: '1px solid var(--border)',
+              color: 'var(--text)',
+            },
+          }}
+        />
       </body>
     </html>
-  );
+  )
 }

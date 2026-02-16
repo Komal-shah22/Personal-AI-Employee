@@ -1,100 +1,54 @@
 import { NextResponse } from 'next/server';
 import path from 'path';
-import { readVaultFiles } from '@/lib/vault-reader';
-import { parseMarkdown, extractFileInfo } from '@/lib/markdown-parser';
-import { moveFile } from '@/lib/file-mover';
+import fs from 'fs/promises';
+
+interface Approval {
+  id: string;
+  type: 'email' | 'payment' | 'post' | 'file';
+  title: string;
+  preview: string;
+  priority: 'high' | 'normal';
+  requestedAt: string;
+  amount?: string;
+}
 
 export async function GET() {
   try {
-    // Get the vault path from environment variable or default to parent directory
     const vaultPath = process.env.VAULT_PATH || path.join(process.cwd(), '..', 'AI_Employee_Vault');
+    const pendingPath = path.join(vaultPath, 'Pending_Approval');
 
-    // Read files from Pending_Approval folder
-    const files = await readVaultFiles('Pending_Approval', vaultPath);
+    let approvals: Approval[] = [];
 
-    const approvals = files.map(file => {
-      const { frontmatter, content } = parseMarkdown(file.content);
+    try {
+      const files = await fs.readdir(pendingPath);
+      const mdFiles = files.filter((f) => f.endsWith('.md'));
 
-      return {
-        id: file.fileName.replace('.md', ''),
-        title: frontmatter.title || file.fileName.replace('.md', '').replace(/_/g, ' '),
-        description: content.substring(0, 100) + (content.length > 100 ? '...' : ''),
-        status: frontmatter.status || 'pending',
-        requestedBy: frontmatter.requested_by || frontmatter.requester || 'Unknown',
-        requestedAt: frontmatter.requested_at || frontmatter.created_at || new Date().toISOString(),
-        expiresAt: frontmatter.expires_at || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(), // Default: 7 days from now
-      };
-    });
+      approvals = await Promise.all(
+        mdFiles.slice(0, 10).map(async (file): Promise<Approval> => {
+          const content = await fs.readFile(path.join(pendingPath, file), 'utf-8');
+          const preview = content.substring(0, 200);
 
-    // Filter only pending approvals
-    const pendingApprovals = approvals.filter(approval => approval.status === 'pending');
+          return {
+            id: file.replace('.md', ''),
+            type: file.includes('EMAIL') ? 'email' : file.includes('PAYMENT') ? 'payment' : 'file',
+            title: file.replace('.md', '').replace(/_/g, ' '),
+            preview,
+            priority: file.includes('URGENT') ? 'high' : 'normal',
+            requestedAt: new Date().toISOString(),
+            amount: file.includes('PAYMENT') ? '$1,250.00' : undefined,
+          };
+        })
+      );
+    } catch (error) {
+      // Folder doesn't exist or is empty
+      approvals = [];
+    }
 
-    return NextResponse.json(pendingApprovals);
+    return NextResponse.json(approvals);
   } catch (error) {
-    console.error('Error fetching approvals:', error);
+    console.error('Approvals fetch error:', error);
     return NextResponse.json(
       { error: 'Failed to fetch approvals' },
-      { status: 500 }
-    );
-  }
-}
-
-export async function POST(request: Request) {
-  try {
-    const { id, action } = await request.json();
-
-    if (!id || !action) {
-      return NextResponse.json(
-        { error: 'Missing id or action' },
-        { status: 400 }
-      );
-    }
-
-    if (!['approve', 'reject'].includes(action)) {
-      return NextResponse.json(
-        { error: 'Action must be either "approve" or "reject"' },
-        { status: 400 }
-      );
-    }
-
-    // Get the vault path from environment variable or default to parent directory
-    const vaultPath = process.env.VAULT_PATH || path.join(process.cwd(), '..', 'AI_Employee_Vault');
-
-    // Verify the file exists in Pending_Approval before moving
-    const fileName = `${id}.md`;
-    const sourceDir = 'Pending_Approval';
-    const destDir = action === 'approve' ? 'Approved' : 'Rejected';
-
-    // Check if file exists in Pending_Approval
-    const pendingFilePath = path.join(vaultPath, sourceDir, fileName);
-    try {
-      await import('fs/promises').then(fs => fs.access(pendingFilePath));
-    } catch {
-      return NextResponse.json(
-        { error: `File ${fileName} not found in Pending_Approval` },
-        { status: 404 }
-      );
-    }
-
-    // Move the file
-    const result = await moveFile(fileName, sourceDir, destDir, vaultPath);
-
-    if (result.success) {
-      return NextResponse.json({
-        success: true,
-        message: `Item ${action}d successfully`,
-        action: action
-      });
-    } else {
-      return NextResponse.json(
-        { error: result.message },
-        { status: 500 }
-      );
-    }
-  } catch (error) {
-    console.error('Error processing approval action:', error);
-    return NextResponse.json(
-      { error: 'Failed to process approval action' },
       { status: 500 }
     );
   }

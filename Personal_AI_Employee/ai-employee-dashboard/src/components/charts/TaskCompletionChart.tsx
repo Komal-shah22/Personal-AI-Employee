@@ -95,27 +95,27 @@ export const TaskCompletionChart = () => {
             type="monotone"
             dataKey="completed"
             stroke="#10B981"
-            strokeWidth={2}
-            dot={{ r: 4 }}
-            activeDot={{ r: 6 }}
+            strokeWidth={3}
+            dot={{ r: 5, fill: '#10B981' }}
+            activeDot={{ r: 7, fill: '#10B981' }}
             name="Completed"
           />
           <Line
             type="monotone"
             dataKey="inProgress"
             stroke="#F59E0B"
-            strokeWidth={2}
-            dot={{ r: 4 }}
-            activeDot={{ r: 6 }}
+            strokeWidth={3}
+            dot={{ r: 5, fill: '#F59E0B' }}
+            activeDot={{ r: 7, fill: '#F59E0B' }}
             name="In Progress"
           />
           <Line
             type="monotone"
             dataKey="pending"
-            stroke="#3B82F6"
-            strokeWidth={2}
-            dot={{ r: 4 }}
-            activeDot={{ r: 6 }}
+            stroke="#00d4ff"
+            strokeWidth={3}
+            dot={{ r: 5, fill: '#00d4ff' }}
+            activeDot={{ r: 7, fill: '#00d4ff' }}
             name="Pending"
           />
         </LineChart>

@@ -1,81 +1,44 @@
 import { NextResponse } from 'next/server';
-import path from 'path';
-import { readVaultFiles } from '@/lib/vault-reader';
-import { parseMarkdown } from '@/lib/markdown-parser';
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
-    // Get the vault path from environment variable or default to parent directory
-    const vaultPath = process.env.VAULT_PATH || path.join(process.cwd(), '..', 'AI_Employee_Vault');
+    const { searchParams } = new URL(request.url);
+    const range = searchParams.get('range') || '7D';
 
-    // Read files from different vault directories
-    const needsActionFiles = await readVaultFiles('Needs_Action', vaultPath);
-    const plansFiles = await readVaultFiles('Plans', vaultPath);
-    const doneFiles = await readVaultFiles('Done', vaultPath);
+    // Mock chart data (in production, this would come from database)
+    let data = [];
 
-    // Count files by date for the last 7 days
-    const now = new Date();
-    const sevenDaysAgo = new Date(now);
-    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-
-    // Helper function to get date string in 'YYYY-MM-DD' format
-    const getDateStr = (date: Date) => date.toISOString().split('T')[0];
-
-    // Create an object to store counts per day
-    const dateCounts: Record<string, { pending: number; inProgress: number; completed: number }> = {};
-
-    // Initialize all dates in the range
-    for (let d = new Date(sevenDaysAgo); d <= now; d.setDate(d.getDate() + 1)) {
-      const dateStr = getDateStr(d);
-      dateCounts[dateStr] = { pending: 0, inProgress: 0, completed: 0 };
+    if (range === '1D') {
+      data = [
+        { date: '00:00', completed: 5, pending: 2, agent: 'Gmail', tasks: 12 },
+        { date: '04:00', completed: 8, pending: 3, agent: 'WhatsApp', tasks: 8 },
+        { date: '08:00', completed: 15, pending: 5, agent: 'LinkedIn', tasks: 5 },
+        { date: '12:00', completed: 23, pending: 4, agent: 'File', tasks: 15 },
+        { date: '16:00', completed: 31, pending: 6, agent: 'Orchestrator', tasks: 23 },
+        { date: '20:00', completed: 38, pending: 3, agent: 'Total', tasks: 63 },
+      ];
+    } else if (range === '7D') {
+      data = [
+        { date: 'Mon', completed: 45, pending: 8, agent: 'Gmail', tasks: 45 },
+        { date: 'Tue', completed: 52, pending: 6, agent: 'WhatsApp', tasks: 32 },
+        { date: 'Wed', completed: 48, pending: 10, agent: 'LinkedIn', tasks: 18 },
+        { date: 'Thu', completed: 61, pending: 7, agent: 'File', tasks: 28 },
+        { date: 'Fri', completed: 58, pending: 9, agent: 'Orchestrator', tasks: 67 },
+        { date: 'Sat', completed: 67, pending: 5, agent: 'Total', tasks: 190 },
+        { date: 'Sun', completed: 73, pending: 3 },
+      ];
+    } else {
+      data = [
+        { date: 'Week 1', completed: 320, pending: 45, agent: 'Gmail', tasks: 320 },
+        { date: 'Week 2', completed: 385, pending: 38, agent: 'WhatsApp', tasks: 245 },
+        { date: 'Week 3', completed: 412, pending: 42, agent: 'LinkedIn', tasks: 156 },
+        { date: 'Week 4', completed: 468, pending: 35, agent: 'File', tasks: 198 },
+      ];
     }
 
-    // Count files by date
-    const fs = await import('fs/promises');
-
-    for (const file of needsActionFiles) {
-      const stat = await fs.stat(file.filePath);
-      const fileDate = new Date(stat.mtime);
-      const dateStr = getDateStr(fileDate);
-
-      if (dateCounts[dateStr]) {
-        dateCounts[dateStr].pending++;
-      }
-    }
-
-    for (const file of plansFiles) {
-      const stat = await fs.stat(file.filePath);
-      const fileDate = new Date(stat.mtime);
-      const dateStr = getDateStr(fileDate);
-
-      if (dateCounts[dateStr]) {
-        dateCounts[dateStr].inProgress++;
-      }
-    }
-
-    for (const file of doneFiles) {
-      const stat = await fs.stat(file.filePath);
-      const fileDate = new Date(stat.mtime);
-      const dateStr = getDateStr(fileDate);
-
-      if (dateCounts[dateStr]) {
-        dateCounts[dateStr].completed++;
-      }
-    }
-
-    // Convert to chart format
-    const chartData = Object.entries(dateCounts)
-      .sort(([dateA], [dateB]) => new Date(dateA).getTime() - new Date(dateB).getTime())
-      .map(([date, counts]) => ({
-        date: new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-        pending: counts.pending,
-        inProgress: counts.inProgress,
-        completed: counts.completed,
-      }));
-
-    return NextResponse.json(chartData);
+    return NextResponse.json(data);
   } catch (error) {
-    console.error('Error fetching chart data:', error);
+    console.error('Chart data error:', error);
     return NextResponse.json(
       { error: 'Failed to fetch chart data' },
       { status: 500 }
