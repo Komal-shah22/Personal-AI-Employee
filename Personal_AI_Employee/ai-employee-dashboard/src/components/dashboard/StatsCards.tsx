@@ -80,7 +80,7 @@ export const StatsCards = () => {
           title: 'Pending Tasks',
           value: data.pending,
           change: data.trends?.pendingChange || 0,
-          changeType: ((data.trends?.pendingChange || 0) >= 0 ? 'positive' : 'negative') as 'positive' | 'negative',
+          changeType: 'positive' as const,
           icon: <Clock className="w-5 h-5" />,
           trendData: [65, 59, 80, 81, 56, 55, 40]
         },
@@ -88,7 +88,7 @@ export const StatsCards = () => {
           title: 'In Progress',
           value: data.inProgress,
           change: data.trends?.inProgressChange || 0,
-          changeType: ((data.trends?.inProgressChange || 0) >= 0 ? 'positive' : 'negative') as 'positive' | 'negative',
+          changeType: 'positive' as const,
           icon: <Play className="w-5 h-5" />,
           trendData: [28, 48, 40, 19, 86, 27, 90]
         },
@@ -96,7 +96,7 @@ export const StatsCards = () => {
           title: 'Completed',
           value: data.completed,
           change: data.trends?.completedChange || 0,
-          changeType: ((data.trends?.completedChange || 0) >= 0 ? 'positive' : 'negative') as 'positive' | 'negative',
+          changeType: 'positive' as const,
           icon: <CheckCircle2 className="w-5 h-5" />,
           trendData: [12, 19, 3, 5, 2, 3, 20]
         },
@@ -104,7 +104,7 @@ export const StatsCards = () => {
           title: 'Total Tasks',
           value: data.total,
           change: data.trends?.totalChange || 0,
-          changeType: ((data.trends?.totalChange || 0) >= 0 ? 'positive' : 'negative') as 'positive' | 'negative',
+          changeType: 'positive' as const,
           icon: <BarChart3 className="w-5 h-5" />,
           trendData: [45, 55, 48, 52, 60, 58, 65]
         },

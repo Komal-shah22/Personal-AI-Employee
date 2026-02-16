@@ -7,6 +7,7 @@ import ArchitectureDiagram from '@/components/ArchitectureDiagram'
 import LiveStatus from '@/components/LiveStatus'
 import ActivityFeed from '@/components/ActivityFeed'
 import QuickActions from '@/components/QuickActions'
+import QuickActionForms from '@/components/dashboard/QuickActionForms'
 import ApprovalQueue from '@/components/ApprovalQueue'
 import TierNav from '@/components/TierNav'
 import AgentCard from '@/components/AgentCard'
@@ -42,6 +43,11 @@ export default function Dashboard() {
         <div className="lg:col-span-1">
           <ActivityFeed />
         </div>
+      </div>
+
+      {/* Quick Action Forms - Email, WhatsApp, LinkedIn */}
+      <div className="mt-8">
+        <QuickActionForms />
       </div>
 
       {/* Quick Actions & Approval Queue */}
