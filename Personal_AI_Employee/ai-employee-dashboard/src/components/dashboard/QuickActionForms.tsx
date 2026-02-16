@@ -32,7 +32,7 @@ export default function QuickActionForms() {
     setMessage('');
 
     try {
-      const response = await fetch('/api/actions/send-email', {
+      const response = await fetch('/api/actions/send-email-direct', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(emailData)
@@ -41,7 +41,11 @@ export default function QuickActionForms() {
       const result = await response.json();
 
       if (response.ok) {
-        setMessage('✅ Email sent successfully!');
+        if (result.fallback) {
+          setMessage('✅ Email queued for sending (direct send unavailable)');
+        } else {
+          setMessage('✅ Email sent successfully via Gmail!');
+        }
         setEmailData({ to: '', subject: '', body: '' });
       } else {
         setMessage(`❌ Error: ${result.error}`);
