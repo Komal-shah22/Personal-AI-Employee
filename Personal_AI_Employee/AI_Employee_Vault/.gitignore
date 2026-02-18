@@ -1,0 +1,21 @@
+# CRITICAL: Never sync these to cloud
+.env
+.env.local
+*.key
+*.pem
+sessions/
+credentials/
+*.credentials.json
+*_token.json
+.whatsapp_processed.json
+.linkedin_last_post.json
+
+# Sensitive logs (keep local only)
+Logs/*payment*
+Logs/*bank*
+Logs/*whatsapp*
+
+# Windows/Mac system files
+.DS_Store
+Thumbs.db
+desktop.ini

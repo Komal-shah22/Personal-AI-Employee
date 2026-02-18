@@ -63,7 +63,7 @@ export default function QuickActionForms() {
     setMessage('');
 
     try {
-      const response = await fetch('/api/actions/send-whatsapp', {
+      const response = await fetch('/api/actions/send-whatsapp-direct', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(whatsappData)
@@ -72,10 +72,18 @@ export default function QuickActionForms() {
       const result = await response.json();
 
       if (response.ok) {
-        setMessage('✅ WhatsApp message sent successfully!');
+        if (result.fallback) {
+          setMessage('✅ WhatsApp message queued for sending (direct send unavailable)');
+        } else {
+          setMessage('✅ WhatsApp message sent successfully!');
+        }
         setWhatsappData({ phone: '', message: '' });
       } else {
-        setMessage(`❌ Error: ${result.error}`);
+        if (result.action_required === 'qr_scan') {
+          setMessage('⚠️ WhatsApp Web not authenticated. Please scan QR code first.');
+        } else {
+          setMessage(`❌ Error: ${result.error}`);
+        }
       }
     } catch (error) {
       setMessage('❌ Failed to send WhatsApp message');
