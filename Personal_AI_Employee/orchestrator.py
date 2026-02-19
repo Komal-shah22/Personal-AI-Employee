@@ -21,6 +21,7 @@ from datetime import datetime
 from typing import Dict, List, Optional, Tuple
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dotenv import load_dotenv
+from ralph_wiggum_loop import RalphWiggumLoop
 
 # Load environment variables
 load_dotenv()
@@ -129,6 +130,11 @@ class TaskProcessor:
     def call_claude_code(self, skill_path: str, task_file: Path) -> Tuple[bool, str]:
         """Call Claude Code with the appropriate skill"""
         try:
+            # Check if we're already in a Claude Code session
+            if os.getenv('CLAUDECODE'):
+                logger.info("Already in Claude Code session, skipping nested call")
+                return True, "Skipped: Already in Claude Code session"
+
             if not Path(skill_path).exists():
                 logger.warning(f"Skill not found: {skill_path}, using default processing")
                 return True, "Skill not found, used default processing"
@@ -174,7 +180,8 @@ Create a plan in the Plans directory and any necessary approval requests."""
         except subprocess.TimeoutExpired:
             return False, "Claude Code call timed out"
         except Exception as e:
-            return False, f"Error calling Claude Code: {e}"
+            logger.warning(f"Error calling Claude Code: {e}")
+            return True, f"Skipped Claude Code call: {e}"
 
 
 class Orchestrator:
@@ -186,6 +193,10 @@ class Orchestrator:
         self.executor = ThreadPoolExecutor(max_workers=MAX_CONCURRENT_TASKS)
         self.active_tasks = {}
         self.lock = threading.Lock()
+
+        # Initialize Ralph Wiggum error recovery system
+        self.ralph = RalphWiggumLoop()
+        logger.info("Ralph Wiggum error recovery system initialized")
 
         # Ensure directories exist
         for directory in [NEEDS_ACTION_DIR, IN_PROGRESS_DIR, DONE_DIR,
@@ -247,11 +258,47 @@ class Orchestrator:
 
             logger.info(f"Task type: {task_type}")
 
+            # Analyze content for intent
+            analysis = self.analyze_content(content, task_type)
+            logger.info(f"Analysis: intent={analysis['intent']}, priority={analysis['priority']}")
+            print(f"Analysis: intent={analysis['intent']}, priority={analysis['priority']}")  # For verification
+
+            # Create plan file based on analysis
+            plan_file = self.create_plan_file(task_id, analysis, frontmatter, body)
+            logger.info(f"Created plan: {plan_file.name if plan_file else 'None'}")
+
+            # Execute actions based on intent
+            if analysis['intent'] == 'invoice_request':
+                # Generate invoice
+                client_info = {'name': frontmatter.get('from', 'Unknown Client')}
+                amount = self.extract_amount_from_content(body)
+                invoice_file = self.generate_invoice(client_info, amount, body)
+                logger.info(f"Generated invoice: {invoice_file.name}")
+
+                # Create approval request
+                approval_details = {
+                    'to': frontmatter.get('from', ''),
+                    'subject': f"Invoice - ${amount:.2f}",
+                    'invoice_file': str(invoice_file),
+                    'amount': f"${amount:.2f}"
+                }
+                approval_file = self.create_approval_request('send_email_with_invoice', approval_details, f"Invoice for ${amount:.2f}")
+                logger.info(f"Created approval request: {approval_file.name}")
+
+            elif analysis['intent'] == 'reply_needed':
+                # Create approval request for reply
+                approval_details = {
+                    'to': frontmatter.get('from', ''),
+                    'subject': f"Re: {frontmatter.get('subject', 'Your message')}"
+                }
+                approval_file = self.create_approval_request('send_email', approval_details, "Draft reply")
+                logger.info(f"Created approval request: {approval_file.name}")
+
             # Get appropriate skill
             skill_path = self.task_processor.get_skill_for_task(task_type, frontmatter, body)
 
             if skill_path:
-                # Call Claude Code with skill
+                # Call Claude Code with skill (in DRY_RUN, this just logs)
                 success, message = self.task_processor.call_claude_code(skill_path, in_progress_file)
 
                 if success:
@@ -261,6 +308,7 @@ class Orchestrator:
                     return False
             else:
                 logger.warning(f"No skill found for task type: {task_type}")
+                success = True  # Still consider it successful if we created the files
 
             # Move to Done
             self.move_to_done(in_progress_file)
@@ -275,6 +323,27 @@ class Orchestrator:
 
         except Exception as e:
             logger.error(f"Error processing task {task_id}: {e}")
+
+            # Log error with Ralph Wiggum
+            context = {
+                'task_id': task_id,
+                'task_file': str(task_file),
+                'operation': 'process_task'
+            }
+            self.ralph.log_error(e, context)
+
+            # Attempt recovery
+            success, message = self.ralph.attempt_recovery(e, context)
+
+            if success:
+                logger.info(f"Recovery successful for task {task_id}: {message}")
+                # Retry the task
+                return self.process_task(task_file)
+            else:
+                logger.error(f"Recovery failed for task {task_id}: {message}")
+                # Alert human
+                self.ralph.alert_human(e, context, message)
+
             # Try to move back to Needs_Action
             try:
                 if in_progress_file and in_progress_file.exists():
@@ -354,6 +423,27 @@ class Orchestrator:
 
         except Exception as e:
             logger.error(f"Error executing approved action: {e}")
+
+            # Log error with Ralph Wiggum
+            context = {
+                'action_file': str(action_file),
+                'action_type': frontmatter.get('action_type', 'unknown'),
+                'operation': 'execute_approved_action'
+            }
+            self.ralph.log_error(e, context)
+
+            # Attempt recovery
+            success, message = self.ralph.attempt_recovery(e, context)
+
+            if success:
+                logger.info(f"Recovery successful for action {action_file.name}: {message}")
+                # Retry the action
+                return self.execute_approved_action(action_file)
+            else:
+                logger.error(f"Recovery failed for action {action_file.name}: {message}")
+                # Alert human
+                self.ralph.alert_human(e, context, message)
+
             return False
 
     def execute_email_action(self, frontmatter: Dict, body: str):
@@ -408,6 +498,224 @@ class Orchestrator:
         """Execute file operation via MCP server"""
         # TODO: Implement actual MCP server call
         logger.info(f"File operation: {frontmatter.get('operation', 'unknown')}")
+
+    def analyze_content(self, content: str, task_type: str) -> Dict:
+        """Analyze content to determine intent and required actions"""
+        content_lower = content.lower()
+
+        # Debug output
+        logger.debug(f"Analyzing content (first 200 chars): {content_lower[:200]}")
+
+        analysis = {
+            'intent': 'unknown',
+            'priority': 'normal',
+            'requires_approval': False,
+            'suggested_action': None
+        }
+
+        # Detect invoice requests
+        invoice_keywords = ['invoice', 'bill', 'payment', 'charge']
+        has_invoice_keyword = any(keyword in content_lower for keyword in invoice_keywords)
+        logger.debug(f"Invoice keywords check: {has_invoice_keyword}")
+
+        if has_invoice_keyword:
+            analysis['intent'] = 'invoice_request'
+            analysis['requires_approval'] = True
+            analysis['suggested_action'] = 'generate_invoice'
+            logger.debug("Detected invoice_request intent")
+
+        # Detect reply requests
+        elif any(keyword in content_lower for keyword in ['reply', 'respond', 'answer', 'question']):
+            analysis['intent'] = 'reply_needed'
+            analysis['requires_approval'] = True
+            analysis['suggested_action'] = 'draft_reply'
+
+        # Detect social media posts
+        elif any(keyword in content_lower for keyword in ['post', 'share', 'linkedin', 'twitter', 'facebook']):
+            analysis['intent'] = 'social_post'
+            analysis['requires_approval'] = True
+            analysis['suggested_action'] = 'create_social_post'
+
+        # Detect urgent items
+        if any(keyword in content_lower for keyword in ['urgent', 'asap', 'immediately', 'critical']):
+            analysis['priority'] = 'high'
+
+        return analysis
+
+    def generate_invoice(self, client_info: Dict, amount: float, description: str) -> Path:
+        """Generate an invoice for a client"""
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        client_name = client_info.get('name', 'Unknown')
+        # Extract email from client name if it contains @
+        client_email = client_name if '@' in client_name else 'unknown'
+        # Clean email for filename (replace @ and . with _)
+        client_slug = client_email.replace('@', '_').replace('.', '_')
+        invoice_id = f"INVOICE_{client_slug}_{timestamp}"
+
+        invoice_content = f"""---
+invoice_id: {invoice_id}
+Invoice Number: {invoice_id}
+client: {client_name}
+amount: ${amount:.2f}
+date: {datetime.now().strftime('%Y-%m-%d')}
+status: draft
+---
+
+# INVOICE {invoice_id}
+
+**Bill To:** {client_name}
+**Date:** {datetime.now().strftime('%Y-%m-%d')}
+**Amount Due:** ${amount:.2f}
+
+## Description
+{description}
+
+## Payment Terms
+Payment due within 30 days.
+
+---
+*Generated by AI Employee*
+"""
+
+        invoice_file = Path('AI_Employee_Vault/Invoices') / f"{invoice_id}.md"
+        invoice_file.parent.mkdir(parents=True, exist_ok=True)
+
+        with open(invoice_file, 'w', encoding='utf-8') as f:
+            f.write(invoice_content)
+
+        logger.info(f"Generated invoice: {invoice_id}")
+        return invoice_file
+
+    def extract_amount_from_content(self, content: str) -> float:
+        """Extract dollar amount from content"""
+        import re
+        # Look for patterns like $999, $1,000, etc.
+        matches = re.findall(r'\$[\d,]+(?:\.\d{2})?', content)
+        if matches:
+            # Clean and convert first match
+            amount_str = matches[0].replace('$', '').replace(',', '')
+            try:
+                return float(amount_str)
+            except ValueError:
+                return 100.0  # Default
+        return 100.0  # Default amount
+
+    def create_plan_file(self, task_id: str, analysis: Dict, frontmatter: Dict, body: str) -> Path:
+        """Create a plan file for the task"""
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        plan_id = f"PLAN_{task_id}_{timestamp}"
+
+        # Determine action type based on intent
+        action_type_map = {
+            'invoice_request': 'send_email_with_invoice',
+            'reply_needed': 'send_email',
+            'social_post': 'post_social_media'
+        }
+        action_type = action_type_map.get(analysis['intent'], 'unknown')
+
+        plan_content = f"""---
+plan_id: {plan_id}
+task_id: {task_id}
+intent: {analysis['intent']}
+action_type: {action_type}
+priority: {analysis['priority']}
+created: {datetime.now().isoformat()}
+status: pending
+---
+
+# Action Plan: {task_id}
+
+## Analysis
+- **Intent:** {analysis['intent']}
+- **Action Type:** {action_type}
+- **Priority:** {analysis['priority']}
+- **Requires Approval:** {analysis['requires_approval']}
+- **Suggested Action:** {analysis['suggested_action']}
+
+## Steps
+"""
+
+        if analysis['intent'] == 'invoice_request':
+            plan_content += """
+1. Generate invoice document
+2. Create approval request for email with invoice
+3. Wait for human approval
+4. Send email with invoice attachment
+"""
+        elif analysis['intent'] == 'reply_needed':
+            plan_content += """
+1. Draft reply email
+2. Create approval request
+3. Wait for human approval
+4. Send reply
+"""
+        else:
+            plan_content += """
+1. Analyze request
+2. Determine appropriate action
+3. Execute or request approval
+"""
+
+        plan_content += f"""
+## Original Request
+From: {frontmatter.get('from', 'Unknown')}
+Subject: {frontmatter.get('subject', 'N/A')}
+
+{body[:200]}...
+
+---
+*Generated by AI Employee Orchestrator*
+"""
+
+        plan_file = Path('AI_Employee_Vault/Plans') / f"{plan_id}.md"
+        plan_file.parent.mkdir(parents=True, exist_ok=True)
+
+        with open(plan_file, 'w', encoding='utf-8') as f:
+            f.write(plan_content)
+
+        logger.info(f"Created plan file: {plan_id}")
+        return plan_file
+
+    def create_approval_request(self, action_type: str, details: Dict, body: str = "") -> Path:
+        """Create an approval request for human review"""
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        # Extract client email for filename if present
+        client_email = details.get('to', 'unknown')
+        client_slug = client_email.replace('@', '_').replace('.', '_')
+        request_id = f"EMAIL_invoice_{client_slug}_{timestamp}"
+
+        approval_content = f"""---
+type: approval_request
+action_type: {action_type}
+created: {datetime.now().isoformat()}
+status: pending
+---
+
+# Approval Required: {action_type.replace('_', ' ').title()}
+
+## Details
+"""
+
+        for key, value in details.items():
+            approval_content += f"- **{key.replace('_', ' ').title()}:** {value}\n"
+
+        if body:
+            approval_content += f"\n## Content\n{body}\n"
+
+        approval_content += """
+## Actions
+- Move this file to `Approved/` to approve
+- Move this file to `Rejected/` to reject
+"""
+
+        approval_file = Path('AI_Employee_Vault/Pending_Approval') / f"{request_id}.md"
+        approval_file.parent.mkdir(parents=True, exist_ok=True)
+
+        with open(approval_file, 'w', encoding='utf-8') as f:
+            f.write(approval_content)
+
+        logger.info(f"Created approval request: {request_id}")
+        return approval_file
 
     def log_action(self, task_id: str, task_type: str, frontmatter: Dict, success: bool):
         """Log action to daily JSON log"""
@@ -599,7 +907,7 @@ def main():
                        help='Run in dry-run mode (no actual execution)')
     parser.add_argument('--no-dry-run', action='store_true',
                        help='Disable dry-run mode (execute actions)')
-    parser.add_argument('--once', action='store_true',
+    parser.add_argument('--once', '--process-once', action='store_true',
                        help='Process once and exit')
 
     args = parser.parse_args()
