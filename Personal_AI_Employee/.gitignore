@@ -59,6 +59,8 @@ token.json
 # Sensitive files
 credentials.json
 .env
+.env.cloud
+.env.local
 .processed_ids.json
 .whatsapp_processed.json
 

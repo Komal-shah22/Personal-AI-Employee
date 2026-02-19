@@ -1,227 +1,131 @@
-# 🚀 Oracle Cloud Deployment - Personal AI Employee
+# Cloud Deployment Guide
 
-This directory contains all the necessary files and scripts to deploy your Personal AI Employee to Oracle Cloud for 24/7 operation.
+## Overview
 
-## 📁 Directory Structure
+This directory contains everything needed to deploy your Personal AI Employee to Oracle Cloud Free Tier for 24/7 operation.
 
-```
-deploy/
-├── oracle-terraform.tf         # Main Terraform configuration
-├── variables.tf                # Terraform variables
-├── outputs.tf                  # Terraform outputs
-├── docker-compose.yml          # Docker configuration
-├── kubernetes-deployment.yaml  # Kubernetes configuration
-├── health_monitor.py           # Health monitoring script
-├── systemd/                    # Systemd service files
-│   ├── ai-employee-orchestrator.service
-│   ├── ai-employee-gmail-watcher.service
-│   ├── ai-employee-filesystem-watcher.service
-│   └── ai-employee-dashboard.service
-├── deploy-oracle.sh            # Oracle Cloud deployment script
-├── deploy-docker.sh            # Docker deployment script
-├── setup-production.sh         # Production setup script
-├── setup-oracle-cloud.sh       # Oracle Cloud setup helper script
-├── oracle-cloud-deployment.md  # Detailed deployment guide
-├── README.md                   # This file
-└── terraform.tfvars.example    # Example Terraform variables
-```
+## Architecture
 
-## 🚀 Quick Start - Oracle Cloud Deployment
+**Cloud VM (Oracle):**
+- Email monitoring (Gmail API)
+- Social media draft generation
+- File processing
+- Plan creation
+- READ-ONLY operations + DRAFT creation
 
-### **Step 1: Prerequisites**
+**Local Machine:**
+- WhatsApp session (NEVER goes to cloud)
+- Payment/banking credentials
+- Final "send" actions
+- Human approvals
+- Dashboard access
 
-1. **Install Oracle Cloud CLI:**
-```bash
-bash -c "$(curl -L https://raw.githubusercontent.com/oracle/oci-cli/master/scripts/install/install.sh)"
-```
+## Files
 
-2. **Configure Oracle Cloud CLI:**
-```bash
-oci setup config
-```
+- `Dockerfile` - Container image definition
+- `docker-compose.cloud.yml` - Cloud deployment configuration
+- `.env.cloud.example` - Template for cloud environment variables
+- `oracle-cloud-setup.md` - Step-by-step Oracle Cloud setup
+- `SECURITY.md` - Security checklist and best practices
 
-3. **Install Terraform:**
-```bash
-# Download from https://www.terraform.io/downloads
-# Or on Ubuntu:
-sudo apt update && sudo apt install terraform
-```
+## Quick Start
 
-### **Step 2: Setup Oracle Cloud Deployment**
-
-1. **Navigate to deploy directory:**
-```bash
-cd deploy/
-```
-
-2. **Run the setup script:**
-```bash
-./setup-oracle-cloud.sh
-```
-
-3. **The script will:**
-   - Check prerequisites
-   - Validate your OCI configuration
-   - Create `terraform.tfvars` file
-   - Show you the deployment plan
-   - Execute the deployment
-
-### **Step 3: Configure Terraform Variables**
-
-1. **Copy the example variables file:**
-```bash
-cp terraform.tfvars.example terraform.tfvars
-```
-
-2. **Edit `terraform.tfvars` with your values:**
-   - `compartment_id`: Your Oracle Cloud compartment OCID
-   - `ssh_public_key_path`: Path to your SSH public key
-   - `region`: Your preferred Oracle Cloud region
-
-### **Step 4: Deploy to Oracle Cloud**
-
-1. **Initialize Terraform:**
-```bash
-terraform init
-```
-
-2. **Validate configuration:**
-```bash
-terraform validate
-```
-
-3. **Create execution plan:**
-```bash
-terraform plan -var-file="terraform.tfvars"
-```
-
-4. **Apply the configuration:**
-```bash
-terraform apply -var-file="terraform.tfvars"
-```
-
-## 🏗️ Infrastructure Components
-
-### **Virtual Cloud Network (VCN)**
-- Isolated network environment
-- Public and private subnets
-- Internet gateway
-- Route tables
-- Security lists (firewall rules)
-
-### **Compute Instance**
-- Shape: `VM.Standard.E4.Flex`
-- 2 OCPUs, 8GB Memory
-- 50GB Boot Volume
-- Ubuntu 22.04 LTS
-- SSH access configured
-
-### **Services Deployed**
-- AI Employee Orchestrator
-- Gmail Watcher
-- Filesystem Watcher
-- Premium Dashboard (Next.js)
-- MCP Servers (Social, Browser, Payment, ERP)
-
-## 🔧 Production Setup
-
-After the infrastructure is deployed:
-
-1. **SSH to your instance:**
-```bash
-ssh ubuntu@<INSTANCE_PUBLIC_IP>
-```
-
-2. **Upload your Personal AI Employee project:**
-```bash
-scp -r /path/to/your/project ubuntu@<INSTANCE_IP>:~/ai-employee
-```
-
-3. **Run production setup:**
-```bash
-cd ~/ai-employee
-chmod +x deploy/setup-production.sh
-sudo ./deploy/setup-production.sh
-```
-
-4. **Verify all services are running:**
-```bash
-sudo systemctl status ai-employee-*
-```
-
-## 🛡️ Security Features
-
-- **Isolated VCN**: Network isolation
-- **Security Lists**: Firewall rules limiting access
-- **SSH Keys**: Secure authentication
-- **Private Subnets**: Internal services
-- **Monitoring**: Health checks and alerts
-
-## 📊 Monitoring and Health Checks
-
-The deployment includes health monitoring:
+### 1. Prepare Local Environment
 
 ```bash
-# Check service status
-sudo systemctl status ai-employee-*
+# Copy environment template
+cp deploy/.env.cloud.example deploy/.env.cloud
 
-# View service logs
-journalctl -u ai-employee-orchestrator -f
-
-# Run health monitoring script
-python3 deploy/health_monitor.py
+# Edit with your API keys (Gmail, LinkedIn, social media)
+# DO NOT add WhatsApp, banking, or payment credentials
+nano deploy/.env.cloud
 ```
 
-## 🔄 Scaling Options
+### 2. Test Build Locally (Optional)
 
-### **Vertical Scaling:**
-- Update `ocpus` and `memory_in_gbs` in variables
-- Apply changes with Terraform
+```bash
+# Build the Docker image
+cd deploy
+docker build -t ai-employee-cloud -f Dockerfile ..
 
-### **Horizontal Scaling:**
-- Use the Kubernetes configuration
-- Deploy multiple instances behind a load balancer
+# Test run (won't work fully without cloud setup)
+docker-compose -f docker-compose.cloud.yml up
+```
 
-## 🆘 Troubleshooting
+### 3. Deploy to Oracle Cloud
 
-### **Common Issues:**
+Follow the complete guide in `oracle-cloud-setup.md`:
 
-1. **Instance not accessible:**
-   - Check security lists allow SSH access
-   - Verify SSH key is correct
-   - Confirm VCN routing
+1. Create Oracle Cloud Free Tier account
+2. Provision VM instance (VM.Standard.E2.1.Micro)
+3. Configure firewall rules
+4. Install Docker on VM
+5. Clone project to VM
+6. Configure .env.cloud with API keys
+7. Start services with docker-compose
+8. Verify health checks
 
-2. **Services not starting:**
-   - Check logs: `journalctl -u <service_name>`
-   - Verify dependencies
-   - Check configuration files
+### 4. Monitor
 
-3. **Dashboard not loading:**
-   - Verify Node.js installation
-   - Check firewall rules
-   - Confirm service status
+```bash
+# SSH into VM
+ssh -i ~/.ssh/oracle_key ubuntu@<VM_IP>
 
-### **Recovery Procedures:**
-- Automated health checks and restarts
-- Backup restoration procedures
-- Rollback strategies
+# Check logs
+cd ai-employee
+docker-compose -f deploy/docker-compose.cloud.yml logs -f
 
-## 📞 Support Resources
+# Check health
+docker exec ai-employee-cloud node scripts/health-check.js
 
-- [Oracle Cloud Documentation](https://docs.oracle.com/en-us/iaas/Content/home.htm)
-- [Terraform Oracle Cloud Provider](https://registry.terraform.io/providers/oracle/oci/latest/docs)
-- [Oracle Cloud Support](https://cloud.oracle.com/support)
+# Restart if needed
+docker-compose -f deploy/docker-compose.cloud.yml restart
+```
 
-## 🎉 Next Steps
+## Security
 
-1. **Monitor the system** for the first 24 hours
-2. **Verify all components** are functioning
-3. **Set up automated backups**
-4. **Configure alerts** for critical issues
-5. **Document the production environment**
+**CRITICAL:** Review `SECURITY.md` before deploying.
 
----
+Key points:
+- ✅ Cloud has Gmail, LinkedIn, social media APIs
+- ❌ Cloud NEVER has WhatsApp session
+- ❌ Cloud NEVER has banking/payment credentials
+- ✅ Cloud creates drafts only
+- ✅ Local machine performs all "send" actions
 
-**Your Personal AI Employee is now ready for 24/7 operation on Oracle Cloud! 🚀**
+## Troubleshooting
 
-Enjoy your Digital FTE operating 168 hours per week!
+### Container won't start
+```bash
+docker logs ai-employee-cloud
+# Check for missing environment variables
+```
+
+### Out of memory
+```bash
+free -h
+docker stats
+# Oracle Free Tier has 1GB RAM - may need to optimize
+```
+
+### Health check failing
+```bash
+docker exec ai-employee-cloud node scripts/health-check.js
+# Check vault is accessible and logs are being written
+```
+
+## Next Steps
+
+After deployment:
+- Set up vault sync between cloud and local (Agent P2)
+- Configure monitoring and alerts (Agent P3)
+- Test end-to-end workflow
+- Set up automated backups
+
+## Support
+
+For issues:
+1. Check logs: `docker-compose logs -f`
+2. Review SECURITY.md checklist
+3. Verify .env.cloud has correct API keys
+4. Check Oracle Cloud firewall rules
