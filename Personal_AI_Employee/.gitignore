@@ -100,6 +100,11 @@ AI_Employee_Vault/Logs/*.log
 # Claude Code specific
 .claude/cache/
 .claude/temp/
+../.claude/
+
+# WhatsApp session data (contains authentication)
+**/.whatsapp_session/
+.whatsapp_session/
 
 # Dashboard build files
 ai-employee-dashboard/.next/
