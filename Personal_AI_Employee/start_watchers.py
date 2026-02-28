@@ -40,6 +40,13 @@ WATCHERS = {
         'description': 'Monitors desktop drop folder for new files',
         'requires_setup': False,
         'setup_file': 'README_file_watcher.md'
+    },
+    'email_processor': {
+        'name': 'Email Processor',
+        'script': 'process_email_queue.py',
+        'description': 'Processes email queues and handles work-related opportunities',
+        'requires_setup': False,
+        'setup_file': 'README_email_processor.md'
     }
 }
 

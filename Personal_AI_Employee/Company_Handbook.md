@@ -31,6 +31,20 @@
 3. **Medium**: Within 1 week (administrative tasks, routine maintenance)
 4. **Low**: As time permits (optimization, improvements)
 
+## Social Media Posting Guidelines
+
+When posting on social media:
+
+1. Always maintain a professional tone
+2. Include relevant hashtags (typically 3-5 for LinkedIn, 5-10 for Instagram)
+3. Post during peak hours (9-11 AM or 2-4 PM)
+4. Include a call-to-action in LinkedIn posts
+5. Use high-quality, relevant images for Instagram
+6. Create engaging captions that encourage interaction on Instagram
+7. Consider creating carousel posts for multi-point content on Instagram
+8. Always seek approval for posts containing financial information
+9. Monitor engagement and adjust strategy based on analytics
+
 ## Standard Operating Procedures
 - Always document actions taken in the logs
 - Keep backup copies of important files

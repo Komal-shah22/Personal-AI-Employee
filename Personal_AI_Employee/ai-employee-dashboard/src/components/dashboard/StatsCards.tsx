@@ -58,11 +58,15 @@ const StatCard = ({ title, value, change, changeType, icon, trendData }: StatCar
 };
 
 export const StatsCards = () => {
-  const [stats, setStats] = useState([
-    { title: 'Pending Tasks', value: 0, change: 0, changeType: 'positive' as const, icon: <Clock className="w-5 h-5" />, trendData: [65, 59, 80, 81, 56, 55, 40] },
-    { title: 'In Progress', value: 0, change: 0, changeType: 'positive' as const, icon: <Play className="w-5 h-5" />, trendData: [28, 48, 40, 19, 86, 27, 90] },
-    { title: 'Completed', value: 0, change: 0, changeType: 'positive' as const, icon: <CheckCircle2 className="w-5 h-5" />, trendData: [12, 19, 3, 5, 2, 3, 20] },
-    { title: 'Total Tasks', value: 0, change: 0, changeType: 'positive' as const, icon: <BarChart3 className="w-5 h-5" />, trendData: [45, 55, 48, 52, 60, 58, 65] },
+  const [stats, setStats] = useState<StatCardProps[]>([
+    { title: 'Pending Tasks', value: 0, change: 0, changeType: 'positive', icon: <Clock className="w-5 h-5" />, trendData: [65, 59, 80, 81, 56, 55, 40] },
+    { title: 'In Progress', value: 0, change: 0, changeType: 'positive', icon: <Play className="w-5 h-5" />, trendData: [28, 48, 40, 19, 86, 27, 90] },
+    { title: 'Completed', value: 0, change: 0, changeType: 'positive', icon: <CheckCircle2 className="w-5 h-5" />, trendData: [12, 19, 3, 5, 2, 3, 20] },
+    { title: 'Total Tasks', value: 0, change: 0, changeType: 'positive', icon: <BarChart3 className="w-5 h-5" />, trendData: [45, 55, 48, 52, 60, 58, 65] },
+    { title: 'Instagram Followers', value: 0, change: 0, changeType: 'positive', icon: <div className="w-5 h-5 bg-gradient-to-r from-purple-500 to-pink-500 rounded-sm"></div>, trendData: [45, 52, 48, 61, 55, 67, 72] },
+    { title: 'LinkedIn Followers', value: 0, change: 0, changeType: 'positive', icon: <div className="w-5 h-5 bg-blue-700 rounded-sm"></div>, trendData: [32, 38, 45, 42, 50, 55, 62] },
+    { title: 'Social Posts', value: 0, change: 0, changeType: 'positive', icon: <div className="w-5 h-5 bg-gradient-to-r from-blue-500 to-purple-600 rounded-sm"></div>, trendData: [12, 15, 18, 22, 19, 25, 30] },
+    { title: 'Engagement Rate', value: 0, change: 0, changeType: 'positive', icon: <div className="w-5 h-5 bg-pink-500 rounded-sm"></div>, trendData: [3.2, 3.8, 4.1, 4.5, 4.2, 5.0, 5.3] },
   ]);
 
   const [loading, setLoading] = useState(true);
@@ -78,35 +82,67 @@ export const StatsCards = () => {
       setStats([
         {
           title: 'Pending Tasks',
-          value: data.pending,
+          value: data.pending || 0,
           change: data.trends?.pendingChange || 0,
-          changeType: 'positive' as const,
+          changeType: (data.trends?.pendingChange >= 0 ? 'positive' : 'negative') as 'positive' | 'negative',
           icon: <Clock className="w-5 h-5" />,
           trendData: [65, 59, 80, 81, 56, 55, 40]
         },
         {
           title: 'In Progress',
-          value: data.inProgress,
+          value: data.inProgress || 0,
           change: data.trends?.inProgressChange || 0,
-          changeType: 'positive' as const,
+          changeType: (data.trends?.inProgressChange >= 0 ? 'positive' : 'negative') as 'positive' | 'negative',
           icon: <Play className="w-5 h-5" />,
           trendData: [28, 48, 40, 19, 86, 27, 90]
         },
         {
           title: 'Completed',
-          value: data.completed,
+          value: data.completed || 0,
           change: data.trends?.completedChange || 0,
-          changeType: 'positive' as const,
+          changeType: (data.trends?.completedChange >= 0 ? 'positive' : 'negative') as 'positive' | 'negative',
           icon: <CheckCircle2 className="w-5 h-5" />,
           trendData: [12, 19, 3, 5, 2, 3, 20]
         },
         {
           title: 'Total Tasks',
-          value: data.total,
+          value: data.total || 0,
           change: data.trends?.totalChange || 0,
-          changeType: 'positive' as const,
+          changeType: (data.trends?.totalChange >= 0 ? 'positive' : 'negative') as 'positive' | 'negative',
           icon: <BarChart3 className="w-5 h-5" />,
           trendData: [45, 55, 48, 52, 60, 58, 65]
+        },
+        {
+          title: 'Instagram Followers',
+          value: data.social?.instagramFollowers || 0,
+          change: data.social?.instagramGrowth || 0,
+          changeType: (data.social?.instagramGrowth >= 0 ? 'positive' : 'negative') as 'positive' | 'negative',
+          icon: <div className="w-5 h-5 bg-gradient-to-r from-purple-500 to-pink-500 rounded-sm"></div>,
+          trendData: [45, 52, 48, 61, 55, 67, 72]
+        },
+        {
+          title: 'LinkedIn Followers',
+          value: data.social?.linkedinFollowers || 0,
+          change: data.social?.linkedinGrowth || 0,
+          changeType: (data.social?.linkedinGrowth >= 0 ? 'positive' : 'negative') as 'positive' | 'negative',
+          icon: <div className="w-5 h-5 bg-blue-700 rounded-sm"></div>,
+          trendData: [32, 38, 45, 42, 50, 55, 62]
+        },
+        {
+          title: 'Social Posts',
+          value: data.social?.totalPosts || 0,
+          change: data.social?.postGrowth || 0,
+          changeType: (data.social?.postGrowth >= 0 ? 'positive' : 'negative') as 'positive' | 'negative',
+          icon: <div className="w-5 h-5 bg-gradient-to-r from-blue-500 to-purple-600 rounded-sm"></div>,
+          trendData: [12, 15, 18, 22, 19, 25, 30]
+        },
+        {
+          title: 'Engagement Rate',
+          value: data.social?.engagementRate || 0,
+          change: data.social?.engagementChange || 0,
+          changeType: (data.social?.engagementChange >= 0 ? 'positive' : 'negative') as 'positive' | 'negative',
+          icon: <div className="w-5 h-5 bg-pink-500 rounded-sm"></div>,
+          trendData: [3.2, 3.8, 4.1, 4.5, 4.2, 5.0, 5.3]
         },
       ]);
     } catch (error) {
@@ -117,6 +153,10 @@ export const StatsCards = () => {
         { title: 'In Progress', value: 0, change: 0, changeType: 'positive' as const, icon: <Play className="w-5 h-5" />, trendData: [28, 48, 40, 19, 86, 27, 90] },
         { title: 'Completed', value: 0, change: 0, changeType: 'positive' as const, icon: <CheckCircle2 className="w-5 h-5" />, trendData: [12, 19, 3, 5, 2, 3, 20] },
         { title: 'Total Tasks', value: 0, change: 0, changeType: 'positive' as const, icon: <BarChart3 className="w-5 h-5" />, trendData: [45, 55, 48, 52, 60, 58, 65] },
+        { title: 'Instagram Followers', value: 0, change: 0, changeType: 'positive' as const, icon: <div className="w-5 h-5 bg-gradient-to-r from-purple-500 to-pink-500 rounded-sm"></div>, trendData: [45, 52, 48, 61, 55, 67, 72] },
+        { title: 'LinkedIn Followers', value: 0, change: 0, changeType: 'positive' as const, icon: <div className="w-5 h-5 bg-blue-700 rounded-sm"></div>, trendData: [32, 38, 45, 42, 50, 55, 62] },
+        { title: 'Social Posts', value: 0, change: 0, changeType: 'positive' as const, icon: <div className="w-5 h-5 bg-gradient-to-r from-blue-500 to-purple-600 rounded-sm"></div>, trendData: [12, 15, 18, 22, 19, 25, 30] },
+        { title: 'Engagement Rate', value: 0, change: 0, changeType: 'positive' as const, icon: <div className="w-5 h-5 bg-pink-500 rounded-sm"></div>, trendData: [3.2, 3.8, 4.1, 4.5, 4.2, 5.0, 5.3] },
       ]);
     } finally {
       setLoading(false);
@@ -137,7 +177,7 @@ export const StatsCards = () => {
   if (loading) {
     return (
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {[...Array(4)].map((_, i) => (
+        {[...Array(8)].map((_, i) => (
           <Card key={i} className="glass-card h-32 animate-pulse">
             <CardHeader className="pb-2">
               <div className="h-4 bg-border rounded w-3/4 mb-2"></div>

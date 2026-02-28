@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import path from 'path';
+import { safeParseJSON } from '@/lib/json-parser';
+import { getPythonCommand } from '@/lib/python-runner';
 
 const execAsync = promisify(exec);
 
@@ -36,15 +38,19 @@ export async function POST(request: NextRequest) {
 
     try {
       // Call Python script to send WhatsApp message directly
+      // Execute from parent directory so script can find sessions folder
+      const parentDir = path.join(process.cwd(), '..');
+      const pythonCmd = getPythonCommand();
       const { stdout, stderr } = await execAsync(
-        `python "${scriptPath}" "${escapedPhone}" "${escapedMessage}"`,
+        `${pythonCmd} "${scriptPath}" "${escapedPhone}" "${escapedMessage}"`,
         {
+          cwd: parentDir, // Run from parent directory
           timeout: 60000, // 60 seconds for WhatsApp Web to load
           maxBuffer: 1024 * 1024
         }
       );
 
-      const result = JSON.parse(stdout);
+      const result = safeParseJSON(stdout);
 
       if (result.success) {
         return NextResponse.json({

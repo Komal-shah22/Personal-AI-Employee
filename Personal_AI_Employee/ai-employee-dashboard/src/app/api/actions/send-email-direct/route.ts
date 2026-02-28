@@ -2,8 +2,18 @@ import { NextRequest, NextResponse } from 'next/server';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import path from 'path';
+import { safeParseJSON } from '@/lib/json-parser';
 
 const execAsync = promisify(exec);
+
+// Get the correct Python command for the platform
+function getPythonCommand(): string {
+  // On Windows, use the full Python path to avoid issues with the py launcher
+  if (process.platform === 'win32') {
+    return 'python';
+  }
+  return 'python3';
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -28,6 +38,7 @@ export async function POST(request: NextRequest) {
 
     // Path to Python script
     const scriptPath = path.join(process.cwd(), '..', 'send_email_direct.py');
+    const pythonCmd = getPythonCommand();
 
     // Escape arguments for shell
     const escapedTo = to.replace(/"/g, '\\"');
@@ -37,14 +48,14 @@ export async function POST(request: NextRequest) {
     try {
       // Call Python script to send email directly
       const { stdout, stderr } = await execAsync(
-        `python "${scriptPath}" "${escapedTo}" "${escapedSubject}" "${escapedBody}"`,
+        `${pythonCmd} "${scriptPath}" "${escapedTo}" "${escapedSubject}" "${escapedBody}"`,
         {
           timeout: 30000,
           maxBuffer: 1024 * 1024
         }
       );
 
-      const result = JSON.parse(stdout);
+      const result = safeParseJSON(stdout);
 
       if (result.success) {
         return NextResponse.json({

@@ -1,0 +1,70 @@
+name: work-email-handler
+version: 1.0.0
+description: Specialized skill for detecting and processing work/employment-related emails with approval workflow
+author: Claude Code
+license: MIT
+
+input_spec:
+  type: file_monitor
+  source: AI_Employee_Vault/Needs_Action/EMAIL_*.md
+  trigger_on: create
+
+capabilities:
+  - email_processing
+  - job_opportunity_detection
+  - response_generation
+  - approval_workflow
+  - dashboard_integration
+
+permissions:
+  - file_system: read
+  - file_system: write
+  - network: none
+
+dependencies:
+  - python: ">=3.8"
+  - pip:
+    - pyyaml
+
+configuration:
+  enabled: true
+  check_interval: 300  # seconds
+  work_keywords:
+    - job
+    - work
+    - employment
+    - opportunity
+    - hire
+    - contract
+    - freelance
+    - position
+    - role
+    - application
+    - candidate
+    - recruit
+    - hiring
+    - vacancy
+    - opening
+    - interview
+    - company
+    - linden
+    - project
+    - engagement
+    - consultant
+    - consulting
+    - freelancer
+    - contractor
+    - offer
+
+  required_approvals:
+    - work_email_response
+
+metadata:
+  category: email
+  tags:
+    - email
+    - job
+    - employment
+    - opportunity
+    - automation
+    - approval

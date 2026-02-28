@@ -4,7 +4,9 @@ LinkedIn Integration for Social MCP Server
 Adds LinkedIn posting capability to existing social media automation
 """
 import logging
+import json
 from typing import Dict, Any
+from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
@@ -14,6 +16,21 @@ class LinkedInIntegration:
     def __init__(self, access_token: str = None):
         self.access_token = access_token
         self.person_urn = None  # LinkedIn person URN
+
+    @classmethod
+    def from_credentials_file(cls, token_file_path="credentials/linkedin_token.json"):
+        """Create LinkedInIntegration instance from credentials file"""
+        try:
+            with open(token_file_path, "r") as f:
+                token_data = json.load(f)
+            access_token = token_data.get("access_token")
+            if not access_token:
+                raise ValueError("No access_token found in credentials file")
+            return cls(access_token)
+        except FileNotFoundError:
+            raise FileNotFoundError(f"LinkedIn token file not found: {token_file_path}")
+        except json.JSONDecodeError:
+            raise ValueError(f"Invalid JSON in LinkedIn token file: {token_file_path}")
 
     async def post_to_linkedin(self, text: str, image_path: str = None) -> Dict[str, Any]:
         """
@@ -133,3 +150,42 @@ class LinkedInIntegration:
             "hashtag_count": hashtag_count,
             "has_cta": has_cta
         }
+
+    def get_user_profile(self) -> Dict[str, Any]:
+        """
+        Get the LinkedIn user profile using the access token
+
+        Returns:
+            Dict with user profile information
+        """
+        if not self.access_token:
+            return {"success": False, "error": "No access token available"}
+
+        headers = {
+            "Authorization": f"Bearer {self.access_token}",
+            "X-Restli-Protocol-Version": "2.0.0"
+        }
+
+        # Get user's basic profile info (requires r_liteprofile scope if available)
+        profile_url = "https://api.linkedin.com/v2/me"
+
+        try:
+            import requests
+            profile_response = requests.get(profile_url, headers=headers)
+            if profile_response.status_code == 200:
+                profile_data = profile_response.json()
+                return {
+                    "success": True,
+                    "profile": profile_data
+                }
+            else:
+                return {
+                    "success": False,
+                    "error": f"Failed to get profile: {profile_response.status_code}",
+                    "details": profile_response.text
+                }
+        except Exception as e:
+            return {
+                "success": False,
+                "error": str(e)
+            }

@@ -12,9 +12,9 @@ from datetime import datetime
 from pathlib import Path
 from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeout
 
-# Session storage
-SESSION_DIR = Path('.whatsapp_session')
-SESSION_DIR.mkdir(exist_ok=True)
+# Session storage - Use same session as watcher
+SESSION_DIR = Path('sessions/whatsapp')
+SESSION_DIR.mkdir(parents=True, exist_ok=True)
 
 def send_whatsapp_direct(phone, message):
     """Send WhatsApp message directly via WhatsApp Web automation"""

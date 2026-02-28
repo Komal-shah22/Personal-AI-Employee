@@ -24,8 +24,36 @@ def load_yaml_frontmatter(content: str) -> tuple:
                 pass
     return {}, content.strip()
 
+def is_work_related_email(email_info: Dict[str, Any]) -> bool:
+    """Check if an email is work/employment related based on keywords."""
+    subject = email_info.get('subject', '').lower()
+    sender = email_info.get('from', '').lower()
+    body = email_info.get('body', '').lower()
+
+    # Work-related keywords
+    work_keywords = [
+        'job', 'work', 'employment', 'opportunity', 'hire', 'contract',
+        'freelance', 'position', 'role', 'application', 'candidate',
+        'recruit', 'hiring', 'vacancy', 'opening', 'interview',
+        'company', 'linden', 'role', 'position', 'project', 'engagement',
+        'consultant', 'consulting', 'freelancer', 'contractor', 'offer'
+    ]
+
+    combined_text = f"{subject} {sender} {body}"
+
+    # Check for work-related keywords
+    for keyword in work_keywords:
+        if keyword in combined_text:
+            return True
+
+    return False
+
 def categorize_email(email_info: Dict[str, Any]) -> str:
     """Categorize email based on sender and content."""
+    # First check if it's a work-related email
+    if is_work_related_email(email_info):
+        return 'work_opportunity'
+
     subject = email_info.get('subject', '').lower()
     sender = email_info.get('from', '').lower()
     body = email_info.get('body', '').lower()
@@ -112,8 +140,8 @@ def calculate_priority_score(email_info: Dict[str, Any], category: str) -> int:
     # Adjust based on category
     if category == 'spam':
         score = max(0, score - 30)  # Reduce spam priority
-    elif category in ['client', 'sales']:
-        score = min(100, score + 10)  # Boost important categories
+    elif category in ['client', 'sales', 'work_opportunity']:
+        score = min(100, score + 15)  # Boost important categories including work opportunities
 
     # Cap the score between 0 and 100
     return max(0, min(100, score))
@@ -121,6 +149,17 @@ def calculate_priority_score(email_info: Dict[str, Any], category: str) -> int:
 def select_template(category: str) -> str:
     """Select appropriate response template based on category."""
     templates = {
+        'work_opportunity': """Dear Hiring Manager,
+
+Thank you for considering me for the opportunity. I appreciate you reaching out about {subject}.
+
+{customized_response}
+
+I look forward to hearing from you and discussing this opportunity further.
+
+Best regards,
+AI Employee Assistant""",
+
         'client': """Dear [Client Name],
 
 Thank you for reaching out regarding {subject}. We appreciate your inquiry and will address your concerns promptly.
@@ -268,7 +307,7 @@ def update_dashboard(processed_emails: List[Dict[str, Any]]) -> None:
         content = "# Personal AI Employee Dashboard\n\n## Executive Summary\n- **Status**: Operational\n- **Last Update**: {{date}}\n- **Active Tasks**: 0\n- **Pending Approval**: 0\n\n## Recent Activity\n- [No recent activity]\n\n## System Status\n- **Watchers Running**: 0\n- **Last Backup**: Never\n"
 
     # Count email statistics
-    email_categories = {'client': 0, 'sales': 0, 'admin': 0, 'team': 0, 'spam': 0}
+    email_categories = {'client': 0, 'sales': 0, 'admin': 0, 'team': 0, 'spam': 0, 'work_opportunity': 0}
     for email in processed_emails:
         category = email.get('category', 'admin')
         if category in email_categories:
@@ -286,7 +325,7 @@ def update_dashboard(processed_emails: List[Dict[str, Any]]) -> None:
             updated_lines.append("## Email Statistics")
             for category, count in email_categories.items():
                 if count > 0:
-                    updated_lines.append(f"- **{category.title()} Emails**: {count}")
+                    updated_lines.append(f"- **{category.replace('_', ' ').title()} Emails**: {count}")
             email_stats_added = True
         elif line.startswith('- **Last Update**:'):
             updated_lines.append(f'- **Last Update**: {datetime.now().strftime("%Y-%m-%d %H:%M:%S UTC")}')
@@ -305,7 +344,7 @@ def update_dashboard(processed_emails: List[Dict[str, Any]]) -> None:
                 final_lines.append("## Email Statistics")
                 for category, count in email_categories.items():
                     if count > 0:
-                        final_lines.append(f"- **{category.title()} Emails**: {count}")
+                        final_lines.append(f"- **{category.replace('_', ' ').title()} Emails**: {count}")
                 break
 
         updated_content = '\n'.join(final_lines)

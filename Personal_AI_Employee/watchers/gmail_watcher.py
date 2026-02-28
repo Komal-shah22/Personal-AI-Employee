@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import List, Dict, Optional
 import base64
 import re
+import psutil
 
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
@@ -32,6 +33,8 @@ PROCESSED_IDS_FILE = '.processed_ids.json'
 LOG_DIR = Path('AI_Employee_Vault/Logs')
 ACTION_DIR = Path('AI_Employee_Vault/Needs_Action')
 TOKEN_FILE = 'token.json'
+WORK_EMAIL_QUEUE_FILE = Path('work_email_queue.json')
+GENERAL_EMAIL_QUEUE_FILE = Path('general_email_queue.json')
 
 # Setup logging
 LOG_DIR.mkdir(parents=True, exist_ok=True)
@@ -146,24 +149,24 @@ class GmailWatcher:
         self.retry_delay = 1
 
     def get_unread_important_emails(self) -> List[Dict]:
-        """Fetch unread and important emails from Gmail"""
+        """Fetch unread emails from Gmail with broader search for work opportunities"""
         try:
-            # Query for unread AND important emails
-            query = 'is:unread is:important'
+            # Query for unread emails (latest 10 only as per requirements)
+            query = 'is:unread'
 
             results = self.service.users().messages().list(
                 userId='me',
                 q=query,
-                maxResults=10
+                maxResults=10  # Process only latest 10 as per requirements
             ).execute()
 
             messages = results.get('messages', [])
 
             if not messages:
-                logger.debug("No unread important emails found")
+                logger.debug("No unread emails found")
                 return []
 
-            logger.info(f"Found {len(messages)} unread important email(s)")
+            logger.info(f"Found {len(messages)} unread email(s) (processing latest 10)")
             return messages
 
         except HttpError as error:
@@ -174,6 +177,66 @@ class GmailWatcher:
             logger.error(f"Unexpected error fetching emails: {e}")
             self.exponential_backoff()
             return []
+
+    def is_work_related_email(self, email_info: Dict[str, str]) -> bool:
+        """Check if an email is work/employment related based on keywords."""
+        subject = email_info.get('subject', '').lower()
+        sender = email_info.get('from', '').lower()
+        body = email_info.get('body', '').lower()
+        snippet = email_info.get('snippet', '').lower()
+
+        # Work-related keywords
+        work_keywords = [
+            'job', 'work', 'employment', 'opportunity', 'hire', 'contract',
+            'freelance', 'position', 'role', 'application', 'candidate',
+            'recruit', 'hiring', 'vacancy', 'opening', 'interview',
+            'company', 'linden', 'role', 'position', 'project', 'engagement',
+            'consultant', 'consulting', 'freelancer', 'contractor', 'offer',
+            'salary', 'compensation', 'pay', 'wage', 'remuneration'
+        ]
+
+        combined_text = f"{subject} {sender} {body} {snippet}"
+
+        # Check for work-related keywords
+        for keyword in work_keywords:
+            if keyword in combined_text:
+                return True
+
+        return False
+
+    def save_email_to_queue(self, email_info: Dict[str, str], is_work_related: bool):
+        """Save email to appropriate queue file."""
+        if is_work_related:
+            queue_file = WORK_EMAIL_QUEUE_FILE
+            email_type = "WORK_RELATED"
+        else:
+            queue_file = GENERAL_EMAIL_QUEUE_FILE
+            email_type = "GENERAL"
+
+        # Add timestamp and type to email info
+        email_info['timestamp'] = datetime.now().isoformat()
+        email_info['email_type'] = email_type
+
+        try:
+            # Load existing queue data
+            if queue_file.exists():
+                with open(queue_file, 'r') as f:
+                    queue_data = json.load(f)
+            else:
+                queue_data = {"emails": [], "last_processed": None, "total_processed": 0}
+
+            # Add email to queue
+            queue_data["emails"].append(email_info)
+            queue_data["total_processed"] += 1
+
+            # Save updated queue
+            with open(queue_file, 'w') as f:
+                json.dump(queue_data, f, indent=2)
+
+            logger.info(f"Saved {email_type} email to queue: {email_info['subject']}")
+
+        except Exception as e:
+            logger.error(f"Error saving email to queue: {e}")
 
     def get_email_details(self, msg_id: str) -> Optional[Dict]:
         """Get detailed information about an email"""
@@ -251,64 +314,48 @@ class GmailWatcher:
         return text[:100]
 
     def create_action_item(self, email: Dict):
-        """Create markdown action item for email"""
+        """Classify email and save to appropriate queue"""
         try:
-            ACTION_DIR.mkdir(parents=True, exist_ok=True)
+            # Check system memory usage first
+            memory_percent = psutil.virtual_memory().percent
+            if memory_percent > 80:  # High memory usage
+                logger.warning(f"High memory usage detected: {memory_percent}%. Skipping detailed processing.")
+                # Save simplified entry to indicate email was detected
+                email_simple = {
+                    'id': email['id'],
+                    'subject': email['subject'],
+                    'from': email['from'],
+                    'date': email['date'],
+                    'priority': 'normal',
+                    'status': 'system_load_high'
+                }
+                self.save_email_to_queue(email_simple, False)  # Save to general queue with note
+                return
 
-            # Create filename
-            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-            safe_subject = self.sanitize_filename(email['subject'])
-            filename = f"EMAIL_{safe_subject}_{timestamp}.md"
-            filepath = ACTION_DIR / filename
+            # Determine if work-related email
+            is_work_related = self.is_work_related_email(email)
 
-            # Determine priority based on subject/content
-            priority = 'high' if any(word in email['subject'].lower() for word in ['urgent', 'asap', 'important', 'critical']) else 'normal'
+            # Create simplified email info for queue (avoid storing full content in memory)
+            email_simple = {
+                'id': email['id'],
+                'subject': email['subject'],
+                'from': email['from'],
+                'date': email['date'],
+                'snippet': email['snippet'][:200] + "..." if len(email['snippet']) > 200 else email['snippet'],  # Limit snippet
+                'priority': 'high' if is_work_related else 'normal'
+            }
 
-            # Create markdown content
-            content = f"""---
-type: email
-from: {email['from']}
-subject: {email['subject']}
-received: {email['date']}
-priority: {priority}
-status: pending
-email_id: {email['id']}
----
-
-# Email: {email['subject']}
-
-## From
-{email['from']}
-
-## Received
-{email['date']}
-
-## Content
-{email['snippet']}
-
----
-
-## Actions Required
-- [ ] Reply to this email
-- [ ] Forward if necessary
-- [ ] Archive after handling
-
-## Notes
-Add any notes or context here before taking action.
-"""
-
-            # Write to file
-            with open(filepath, 'w', encoding='utf-8') as f:
-                f.write(content)
-
-            logger.info(f"Created action item: {filename}")
+            # Save to appropriate queue
+            self.save_email_to_queue(email_simple, is_work_related)
 
             # Mark as processed
             self.processed_ids.add(email['id'])
             self.save_processed_ids()
 
+            logger.info(f"Processed email as { 'WORK_RELATED' if is_work_related else 'GENERAL' }: {email['subject']}")
+
         except Exception as e:
-            logger.error(f"Error creating action item for email {email['id']}: {e}")
+            logger.error(f"Error processing email {email['id']}: {e}")
 
     def process_emails(self):
         """Main processing loop for emails"""

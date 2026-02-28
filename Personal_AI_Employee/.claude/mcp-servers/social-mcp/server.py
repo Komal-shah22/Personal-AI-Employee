@@ -10,11 +10,16 @@ import os
 from typing import Dict, Any, List
 from pathlib import Path
 
-# Import LinkedIn integration
+# Import LinkedIn and Instagram integrations
 try:
     from linkedin_integration import LinkedInIntegration
 except ImportError:
     LinkedInIntegration = None
+
+try:
+    from instagram_integration import InstagramIntegration
+except ImportError:
+    InstagramIntegration = None
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -39,6 +44,11 @@ class SocialMCPServer:
                 },
                 {
                     "type": "create_post",
+                    "name": "create_instagram_carousel",
+                    "description": "Create an Instagram carousel with multiple images/videos and caption"
+                },
+                {
+                    "type": "create_post",
                     "name": "create_twitter_post",
                     "description": "Create a Twitter/X post with text"
                 },
@@ -46,6 +56,11 @@ class SocialMCPServer:
                     "type": "create_post",
                     "name": "create_linkedin_post",
                     "description": "Create a LinkedIn post with text and optional image"
+                },
+                {
+                    "type": "get_analytics",
+                    "name": "get_instagram_analytics",
+                    "description": "Get analytics for an Instagram post"
                 },
                 {
                     "type": "get_analytics",
@@ -68,6 +83,16 @@ class SocialMCPServer:
             logger.info("LinkedIn integration enabled")
         else:
             logger.warning("LinkedIn integration not available")
+
+        # Initialize Instagram integration
+        instagram_token = os.getenv('INSTAGRAM_ACCESS_TOKEN')
+        instagram_account_id = os.getenv('INSTAGRAM_ACCOUNT_ID')
+        self.instagram = InstagramIntegration(instagram_token, instagram_account_id) if InstagramIntegration else None
+
+        if self.instagram:
+            logger.info("Instagram integration enabled")
+        else:
+            logger.warning("Instagram integration not available")
 
     async def handle_request(self, request: Dict[str, Any]) -> Dict[str, Any]:
         """Handle MCP requests"""
@@ -92,8 +117,14 @@ class SocialMCPServer:
                 return await self.create_instagram_post(request)
             elif method == "create_twitter_post":
                 return await self.create_twitter_post(request)
+            elif method == "create_instagram_post":
+                return await self.create_instagram_post(request)
+            elif method == "create_instagram_carousel":
+                return await self.create_instagram_carousel(request)
             elif method == "create_linkedin_post":
                 return await self.create_linkedin_post(request)
+            elif method == "get_instagram_analytics":
+                return await self.get_instagram_analytics(request)
             elif method == "get_linkedin_analytics":
                 return await self.get_linkedin_analytics(request)
             elif method == "get_social_feed":
@@ -151,25 +182,90 @@ class SocialMCPServer:
         params = request.get("params", {})
         caption = params.get("caption", "")
         image_path = params.get("image_path", "")
+        image_url = params.get("image_url", "")
         hashtags = params.get("hashtags", [])
 
-        # Simulate Instagram post creation (in real implementation, would use Instagram API)
+        if not self.instagram:
+            return {
+                "jsonrpc": "2.0",
+                "id": request.get("id"),
+                "error": {
+                    "code": -32603,
+                    "message": "Instagram integration not configured. Set INSTAGRAM_ACCESS_TOKEN and INSTAGRAM_ACCOUNT_ID in .env"
+                }
+            }
+
+        # Validate post format
+        validation = self.instagram.validate_post_format(caption)
+        if not validation["valid"]:
+            logger.warning(f"Instagram post validation issues: {validation['issues']}")
+
+        # Post to Instagram
         logger.info(f"Creating Instagram post: {caption[:50]}...")
+        result = await self.instagram.post_to_instagram(caption, image_path, image_url)
 
         # Log the post to the vault for audit trail
-        self.log_social_activity("instagram", "post", caption, image_path)
+        self.log_social_activity("instagram", "post", caption, image_path or image_url)
 
         return {
             "jsonrpc": "2.0",
             "id": request.get("id"),
             "result": {
-                "status": "success",
+                "status": "success" if result["success"] else "error",
                 "platform": "instagram",
                 "caption": caption,
                 "hashtags": hashtags,
                 "scheduled_time": "immediate",
-                "post_url": "https://instagram.com/placeholder",
-                "message": f"Instagram post created successfully: {caption[:30]}..."
+                "post_url": result.get("url", ""),
+                "validation": validation,
+                "message": f"Instagram post created successfully: {caption[:30]}...",
+                "post_id": result.get("post_id", "")
+            }
+        }
+
+    async def create_instagram_carousel(self, request: Dict[str, Any]) -> Dict[str, Any]:
+        """Create an Instagram carousel post"""
+        params = request.get("params", {})
+        caption = params.get("caption", "")
+        media_urls = params.get("media_urls", [])
+        hashtags = params.get("hashtags", [])
+
+        if not self.instagram:
+            return {
+                "jsonrpc": "2.0",
+                "id": request.get("id"),
+                "error": {
+                    "code": -32603,
+                    "message": "Instagram integration not configured. Set INSTAGRAM_ACCESS_TOKEN and INSTAGRAM_ACCOUNT_ID in .env"
+                }
+            }
+
+        # Validate post format
+        validation = self.instagram.validate_post_format(caption)
+        if not validation["valid"]:
+            logger.warning(f"Instagram carousel validation issues: {validation['issues']}")
+
+        # Create carousel post
+        logger.info(f"Creating Instagram carousel: {caption[:50]}...")
+        result = await self.instagram.post_carousel_to_instagram(caption, media_urls)
+
+        # Log the post to the vault for audit trail
+        self.log_social_activity("instagram", "carousel", caption, f"{len(media_urls)} media items")
+
+        return {
+            "jsonrpc": "2.0",
+            "id": request.get("id"),
+            "result": {
+                "status": "success" if result["success"] else "error",
+                "platform": "instagram_carousel",
+                "caption": caption,
+                "media_count": len(media_urls),
+                "hashtags": hashtags,
+                "scheduled_time": "immediate",
+                "post_url": result.get("url", ""),
+                "validation": validation,
+                "message": f"Instagram carousel created successfully: {caption[:30]}...",
+                "post_id": result.get("post_id", "")
             }
         }
 
@@ -238,6 +334,30 @@ class SocialMCPServer:
                 "validation": validation,
                 "message": f"LinkedIn post created successfully: {text[:30]}..."
             }
+        }
+
+    async def get_instagram_analytics(self, request: Dict[str, Any]) -> Dict[str, Any]:
+        """Get analytics for an Instagram post"""
+        params = request.get("params", {})
+        post_id = params.get("post_id", "")
+
+        if not self.instagram:
+            return {
+                "jsonrpc": "2.0",
+                "id": request.get("id"),
+                "error": {
+                    "code": -32603,
+                    "message": "Instagram integration not configured"
+                }
+            }
+
+        logger.info(f"Fetching Instagram analytics for post: {post_id}")
+        analytics = await self.instagram.get_post_analytics(post_id)
+
+        return {
+            "jsonrpc": "2.0",
+            "id": request.get("id"),
+            "result": analytics
         }
 
     async def get_linkedin_analytics(self, request: Dict[str, Any]) -> Dict[str, Any]:

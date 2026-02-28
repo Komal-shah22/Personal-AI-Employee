@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { exec } from 'child_process';
 import path from 'path';
+import { getPythonCommand } from '@/lib/python-runner';
 
 export async function POST() {
   try {
@@ -8,7 +9,8 @@ export async function POST() {
       ? path.join(process.env.SCRIPTS_PATH, 'ceo_briefing.py')
       : path.join(process.cwd(), '..', 'ceo_briefing.py');
 
-    const command = `python "${briefingPath}"`;
+    const pythonCmd = getPythonCommand();
+    const command = `${pythonCmd} "${briefingPath}"`;
 
     // Run briefing generation in background
     exec(command, (error, stdout, stderr) => {

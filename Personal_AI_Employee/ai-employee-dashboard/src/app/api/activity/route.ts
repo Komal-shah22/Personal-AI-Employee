@@ -11,6 +11,14 @@ export async function GET() {
     const activities = [
       {
         id: '1',
+        timestamp: new Date(Date.now() - 1 * 60 * 1000).toISOString(),
+        agent: 'Instagram Agent',
+        agentIcon: '📸',
+        action: 'Posted new product showcase',
+        status: 'success',
+      },
+      {
+        id: '2',
         timestamp: new Date(Date.now() - 2 * 60 * 1000).toISOString(),
         agent: 'Gmail Watcher',
         agentIcon: '📧',
@@ -18,7 +26,7 @@ export async function GET() {
         status: 'success',
       },
       {
-        id: '2',
+        id: '3',
         timestamp: new Date(Date.now() - 5 * 60 * 1000).toISOString(),
         agent: 'Orchestrator',
         agentIcon: '🎛️',
@@ -26,7 +34,15 @@ export async function GET() {
         status: 'success',
       },
       {
-        id: '3',
+        id: '4',
+        timestamp: new Date(Date.now() - 8 * 60 * 1000).toISOString(),
+        agent: 'Instagram Agent',
+        agentIcon: '📸',
+        action: 'Created Instagram story',
+        status: 'success',
+      },
+      {
+        id: '5',
         timestamp: new Date(Date.now() - 10 * 60 * 1000).toISOString(),
         agent: 'WhatsApp Monitor',
         agentIcon: '💬',
@@ -34,15 +50,23 @@ export async function GET() {
         status: 'pending',
       },
       {
-        id: '4',
-        timestamp: new Date(Date.now() - 15 * 60 * 1000).toISOString(),
+        id: '6',
+        timestamp: new Date(Date.now() - 12 * 60 * 1000).toISOString(),
         agent: 'LinkedIn Agent',
         agentIcon: '💼',
-        action: 'Posted update successfully',
+        action: 'Posted industry insights',
         status: 'success',
       },
       {
-        id: '5',
+        id: '7',
+        timestamp: new Date(Date.now() - 15 * 60 * 1000).toISOString(),
+        agent: 'Instagram Agent',
+        agentIcon: '📸',
+        action: 'Scheduled weekly posts',
+        status: 'success',
+      },
+      {
+        id: '8',
         timestamp: new Date(Date.now() - 20 * 60 * 1000).toISOString(),
         agent: 'File Watcher',
         agentIcon: '📂',

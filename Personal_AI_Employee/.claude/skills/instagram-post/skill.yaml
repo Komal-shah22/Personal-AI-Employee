@@ -1,0 +1,86 @@
+# Instagram Post Skill Configuration
+name: "instagram-post"
+version: "1.0.0"
+description: "Create and manage Instagram posts for the Personal AI Employee"
+author: "AI Employee Development Team"
+license: "MIT"
+
+functions:
+  - name: post_to_instagram
+    description: "Create a single image/video Instagram post"
+    parameters:
+      type: object
+      required:
+        - caption
+      properties:
+        caption:
+          type: string
+          description: "The caption for the Instagram post (max 2200 characters)"
+        image_path:
+          type: string
+          description: "Local path to the image file"
+        image_url:
+          type: string
+          description: "URL of the image to use"
+        hashtags:
+          type: array
+          items:
+            type: string
+          description: "List of hashtags to include"
+    returns:
+      type: object
+      description: "Result of the post operation"
+
+  - name: post_instagram_carousel
+    description: "Create an Instagram carousel post with multiple images/videos"
+    parameters:
+      type: object
+      required:
+        - caption
+        - media_urls
+      properties:
+        caption:
+          type: string
+          description: "The caption for the carousel post"
+        media_urls:
+          type: array
+          items:
+            type: string
+          description: "List of URLs for the media items in the carousel (2-10 items)"
+        hashtags:
+          type: array
+          items:
+            type: string
+          description: "List of hashtags to include"
+    returns:
+      type: object
+      description: "Result of the carousel post operation"
+
+  - name: get_instagram_analytics
+    description: "Get analytics for an Instagram post"
+    parameters:
+      type: object
+      required:
+        - post_id
+      properties:
+        post_id:
+          type: string
+          description: "The ID of the Instagram post"
+    returns:
+      type: object
+      description: "Analytics data for the post"
+
+execution_context:
+  requires_vault: true
+  requires_mcp: true
+  allowed_file_operations:
+    - read
+    - write
+  allowed_network_access: true
+
+tags:
+  - social_media
+  - instagram
+  - marketing
+  - automation
+  - gold_tier

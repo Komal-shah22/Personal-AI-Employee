@@ -219,6 +219,9 @@ class Orchestrator:
         """Move task to In_Progress folder"""
         try:
             dest = IN_PROGRESS_DIR / task_file.name
+            # Remove existing file if it exists
+            if dest.exists():
+                dest.unlink()
             task_file.rename(dest)
             logger.info(f"Moved to In_Progress: {task_file.name}")
             return dest
@@ -297,29 +300,44 @@ class Orchestrator:
             # Get appropriate skill
             skill_path = self.task_processor.get_skill_for_task(task_type, frontmatter, body)
 
-            if skill_path:
-                # Call Claude Code with skill (in DRY_RUN, this just logs)
-                success, message = self.task_processor.call_claude_code(skill_path, in_progress_file)
+            # Set success to True by default (files were created)
+            success = True
 
-                if success:
-                    logger.info(f"Task processed successfully: {task_id}")
+            if skill_path:
+                # Only call Claude Code if NOT in DRY_RUN mode and not in a Claude Code session
+                if not self.dry_run and not os.getenv('CLAUDECODE'):
+                    # Call Claude Code with skill
+                    success, message = self.task_processor.call_claude_code(skill_path, in_progress_file)
+
+                    if success:
+                        logger.info(f"Task processed successfully: {task_id}")
+                    else:
+                        logger.error(f"Task processing failed: {task_id} - {message}")
+                        # Don't return False here since we already created the files
                 else:
-                    logger.error(f"Task processing failed: {task_id} - {message}")
-                    return False
+                    if self.dry_run:
+                        logger.info(f"DRY RUN: Would call Claude Code with skill {skill_path}")
+                    else:
+                        logger.info(f"Skipping Claude Code call (inside session): {skill_path}")
             else:
                 logger.warning(f"No skill found for task type: {task_type}")
-                success = True  # Still consider it successful if we created the files
 
             # Move to Done
-            self.move_to_done(in_progress_file)
+            done_file = self.move_to_done(in_progress_file)
 
-            # Log action
-            self.log_action(task_id, task_type, frontmatter, success)
+            if done_file:
+                # Log action
+                self.log_action(task_id, task_type, frontmatter, success)
 
-            # Update dashboard
-            self.update_dashboard(task_id, task_type, frontmatter)
+                # Update dashboard
+                self.update_dashboard(task_id, task_type, frontmatter)
 
-            return True
+                logger.info(f"Task completed: {task_id}")
+            else:
+                logger.error(f"Failed to move task to Done: {task_id}")
+                success = False
+
+            return success
 
         except Exception as e:
             logger.error(f"Error processing task {task_id}: {e}")
@@ -333,9 +351,9 @@ class Orchestrator:
             self.ralph.log_error(e, context)
 
             # Attempt recovery
-            success, message = self.ralph.attempt_recovery(e, context)
+            recovery_success, message = self.ralph.attempt_recovery(e, context)
 
-            if success:
+            if recovery_success:
                 logger.info(f"Recovery successful for task {task_id}: {message}")
                 # Retry the task
                 return self.process_task(task_file)
@@ -346,8 +364,9 @@ class Orchestrator:
 
             # Try to move back to Needs_Action
             try:
-                if in_progress_file and in_progress_file.exists():
-                    in_progress_file.rename(NEEDS_ACTION_DIR / task_file.name)
+                in_progress_path = IN_PROGRESS_DIR / task_file.name
+                if in_progress_path.exists():
+                    in_progress_path.rename(NEEDS_ACTION_DIR / task_file.name)
             except:
                 pass
             return False
@@ -692,6 +711,9 @@ status: pending
 ---
 
 # Approval Required: {action_type.replace('_', ' ').title()}
+
+## Proposed Action
+Execute: **{action_type}**
 
 ## Details
 """

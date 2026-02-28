@@ -1,0 +1,3 @@
+# Requirements for Instagram Post Skill
+# This skill uses the built-in capabilities of the social MCP server
+# No additional packages required beyond standard Python libraries

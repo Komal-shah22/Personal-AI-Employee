@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { exec } from 'child_process';
 import path from 'path';
+import { getPythonCommand } from '@/lib/python-runner';
 
 export async function POST() {
   try {
@@ -8,7 +9,8 @@ export async function POST() {
       ? path.join(process.env.SCRIPTS_PATH, 'orchestrator.py')
       : path.join(process.cwd(), '..', 'orchestrator.py');
 
-    const command = `python "${orchestratorPath}"`;
+    const pythonCmd = getPythonCommand();
+    const command = `${pythonCmd} "${orchestratorPath}"`;
 
     // Run orchestrator in background
     exec(command, (error, stdout, stderr) => {

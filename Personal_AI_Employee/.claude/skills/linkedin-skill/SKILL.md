@@ -165,7 +165,7 @@ status: pending_approval
 
 1. Go to [LinkedIn Developers](https://www.linkedin.com/developers/)
 2. Create an app
-3. Request permissions: `w_member_social`, `r_liteprofile`
+3. Request permissions: `w_member_social`
 4. Generate access token
 5. Add to `.env`:
    ```

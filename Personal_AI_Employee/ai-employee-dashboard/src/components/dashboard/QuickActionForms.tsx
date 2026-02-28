@@ -3,7 +3,7 @@
 import { useState } from 'react';
 
 export default function QuickActionForms() {
-  const [activeTab, setActiveTab] = useState<'email' | 'whatsapp' | 'linkedin'>('email');
+  const [activeTab, setActiveTab] = useState<'email' | 'whatsapp' | 'linkedin' | 'instagram'>('email');
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
 
@@ -23,6 +23,12 @@ export default function QuickActionForms() {
   // LinkedIn Form State
   const [linkedinData, setLinkedinData] = useState({
     content: '',
+    imageUrl: ''
+  });
+
+  // Instagram Form State
+  const [instagramData, setInstagramData] = useState({
+    caption: '',
     imageUrl: ''
   });
 
@@ -119,6 +125,33 @@ export default function QuickActionForms() {
     }
   };
 
+  const handleInstagramSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setMessage('');
+
+    try {
+      const response = await fetch('/api/actions/post-instagram', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(instagramData)
+      });
+
+      const result = await response.json();
+
+      if (response.ok) {
+        setMessage('✅ Instagram post created successfully!');
+        setInstagramData({ caption: '', imageUrl: '' });
+      } else {
+        setMessage(`❌ Error: ${result.error}`);
+      }
+    } catch (error) {
+      setMessage('❌ Failed to post to Instagram');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="bg-white rounded-lg shadow-md p-6">
       <h2 className="text-2xl font-bold mb-6">Quick Actions</h2>
@@ -154,6 +187,16 @@ export default function QuickActionForms() {
           }`}
         >
           💼 LinkedIn
+        </button>
+        <button
+          onClick={() => setActiveTab('instagram')}
+          className={`pb-2 px-4 font-medium transition-colors ${
+            activeTab === 'instagram'
+              ? 'border-b-2 border-pink-500 text-pink-600'
+              : 'text-gray-500 hover:text-gray-700'
+          }`}
+        >
+          📷 Instagram
         </button>
       </div>
 
@@ -300,6 +343,48 @@ export default function QuickActionForms() {
             className="w-full bg-blue-700 text-white py-2 px-4 rounded-md hover:bg-blue-800 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
           >
             {loading ? 'Posting...' : 'Post to LinkedIn'}
+          </button>
+        </form>
+      )}
+
+      {/* Instagram Form */}
+      {activeTab === 'instagram' && (
+        <form onSubmit={handleInstagramSubmit} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Caption
+            </label>
+            <textarea
+              required
+              value={instagramData.caption}
+              onChange={(e) => setInstagramData({ ...instagramData, caption: e.target.value })}
+              rows={6}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-pink-500"
+              placeholder="Write your Instagram caption..."
+            />
+            <p className="text-xs text-gray-500 mt-1">Max 2200 characters, use #hashtags for better reach</p>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Image URL (Required)
+            </label>
+            <input
+              type="url"
+              required
+              value={instagramData.imageUrl}
+              onChange={(e) => setInstagramData({ ...instagramData, imageUrl: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-pink-500"
+              placeholder="https://example.com/image.jpg"
+            />
+          </div>
+
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full bg-pink-600 text-white py-2 px-4 rounded-md hover:bg-pink-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
+          >
+            {loading ? 'Posting...' : 'Post to Instagram'}
           </button>
         </form>
       )}

@@ -10,6 +10,12 @@ interface HistoricalDataPoint {
     inProgress: number;
     completed: number;
     total: number;
+    social?: {
+      instagramFollowers: number;
+      linkedinFollowers: number;
+      totalPosts: number;
+      engagementRate: number;
+    };
   };
 }
 
@@ -25,11 +31,20 @@ export async function GET() {
     const completed = await countVaultFiles('Done', vaultPath);
     const total = pending + inProgress + completed;
 
+    // Get social media metrics (simulated)
+    const socialMetrics = {
+      instagramFollowers: 1245,
+      linkedinFollowers: 876,
+      totalPosts: 42,
+      engagementRate: 4.8
+    };
+
     const currentStats = {
       pending,
       inProgress,
       completed,
       total,
+      social: socialMetrics
     };
 
     // Store current data for trend calculation
@@ -48,6 +63,7 @@ export async function GET() {
       inProgress,
       completed,
       total,
+      social: socialMetrics,
       trends,
     });
   } catch (error) {
@@ -59,7 +75,7 @@ export async function GET() {
   }
 }
 
-function calculateTrends(historicalData: HistoricalDataPoint[], currentStats: { pending: number; inProgress: number; completed: number; total: number }) {
+function calculateTrends(historicalData: HistoricalDataPoint[], currentStats: { pending: number; inProgress: number; completed: number; total: number; social?: any }) {
   if (historicalData.length < 2) {
     // If not enough historical data, return neutral trends
     return {
@@ -67,6 +83,10 @@ function calculateTrends(historicalData: HistoricalDataPoint[], currentStats: { 
       inProgressChange: 0,
       completedChange: 0,
       totalChange: 0,
+      instagramGrowth: 0,
+      linkedinGrowth: 0,
+      postGrowth: 0,
+      engagementChange: 0,
     };
   }
 
@@ -79,10 +99,31 @@ function calculateTrends(historicalData: HistoricalDataPoint[], currentStats: { 
     return Math.round(((current - past) / past) * 100);
   };
 
-  return {
+  // Calculate task trends
+  const taskTrends = {
     pendingChange: calculateChange(currentStats.pending, pastData.stats.pending),
     inProgressChange: calculateChange(currentStats.inProgress, pastData.stats.inProgress),
     completedChange: calculateChange(currentStats.completed, pastData.stats.completed),
     totalChange: calculateChange(currentStats.total, pastData.stats.total),
+  };
+
+  // Calculate social media trends if social data exists
+  if (currentStats.social && pastData.stats.social) {
+    return {
+      ...taskTrends,
+      instagramGrowth: calculateChange(currentStats.social.instagramFollowers, pastData.stats.social.instagramFollowers),
+      linkedinGrowth: calculateChange(currentStats.social.linkedinFollowers, pastData.stats.social.linkedinFollowers),
+      postGrowth: calculateChange(currentStats.social.totalPosts, pastData.stats.social.totalPosts),
+      engagementChange: calculateChange(currentStats.social.engagementRate, pastData.stats.social.engagementRate),
+    };
+  }
+
+  // Return task trends only if no social data
+  return {
+    ...taskTrends,
+    instagramGrowth: 0,
+    linkedinGrowth: 0,
+    postGrowth: 0,
+    engagementChange: 0,
   };
 }
